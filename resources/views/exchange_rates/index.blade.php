@@ -85,7 +85,7 @@
                             <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40">
                                 <td class="px-4 sm:px-6 py-3">
                                     <div class="font-medium">{{ \Carbon\Carbon::parse($r->date)->format('d/m/Y') }}</div>
-                                    @if($r->date === $today)
+                                    @if(\Carbon\Carbon::parse($r->date)->toDateString() === $today)
                                         <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
                                             Hoy
                                         </span>
