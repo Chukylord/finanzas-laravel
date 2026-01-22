@@ -38,7 +38,42 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <x-form.input label="Cuotas pagadas" name="installments_paid" type="number" :value="$debt->installments_paid" required min="0" max="600" />
-                    <x-form.input label="Monto cuota" name="installment_amount" type="number" step="0.01" :value="$debt->installment_amount" required />
+
+                    {{-- Monto cuota + botón --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+                            Monto cuota
+                        </label>
+
+                        <div class="flex gap-2">
+                            <input
+                                id="installment_amount"
+                                name="installment_amount"
+                                type="number"
+                                step="0.01"
+                                value="{{ old('installment_amount', $debt->installment_amount) }}"
+                                required
+                                class="w-full rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500"
+                            />
+
+                            <button
+                                type="button"
+                                id="btn_recalc_cuota"
+                                class="shrink-0 px-3 py-2 rounded-xl text-sm font-semibold border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                title="Recalcular Monto cuota"
+                            >
+                                Recalcular
+                            </button>
+                        </div>
+
+                        @error('installment_amount')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            Se calcula como <span class="font-medium">Monto total / Cuotas</span>.
+                        </p>
+                    </div>
                 </div>
 
                 <x-form.input
@@ -69,4 +104,50 @@
             </form>
         </div>
     </div>
+
+    <script>
+        (function () {
+            const totalEl = document.querySelector('input[name="total_amount"]');
+            const cuotasEl = document.querySelector('input[name="installments_total"]');
+            const cuotaEl = document.querySelector('input[name="installment_amount"]');
+            const btn = document.getElementById('btn_recalc_cuota');
+
+            if (!totalEl || !cuotasEl || !cuotaEl || !btn) return;
+
+            let cuotaTouched = false;
+
+            const toNumber = (v) => {
+                if (v === null || v === undefined) return 0;
+                const str = String(v).replace(',', '.');
+                const n = parseFloat(str);
+                return Number.isFinite(n) ? n : 0;
+            };
+
+            const round2 = (n) => Math.round(n * 100) / 100;
+
+            const calc = (force = false) => {
+                if (!force && cuotaTouched) return;
+
+                const total = toNumber(totalEl.value);
+                const cuotas = toNumber(cuotasEl.value);
+
+                if (total > 0 && cuotas > 0) {
+                    cuotaEl.value = round2(total / cuotas);
+                }
+            };
+
+            cuotaEl.addEventListener('input', () => {
+                cuotaTouched = true;
+            });
+
+            totalEl.addEventListener('input', () => calc(false));
+            cuotasEl.addEventListener('input', () => calc(false));
+
+            btn.addEventListener('click', () => {
+                cuotaTouched = false;
+                calc(true);
+                cuotaEl.focus();
+            });
+        })();
+    </script>
 </x-app-layout>

@@ -52,6 +52,14 @@
             <a class="{{ $link }} {{ request()->routeIs('categories.*') ? $active : '' }}" href="{{ route('categories.index') }}">
                 <span>🏷️</span> <span>Categorías</span>
             </a>
+            <a class="{{ $link }} {{ request()->routeIs('markets.*') ? $active : '' }}" href="{{ route('markets.index') }}">
+                <span>🌐</span> <span>Mercados</span>
+            </a>
+
+            <a class="{{ $link }} {{ request()->routeIs('investments.*') ? $active : '' }}" href="{{ route('investments.index') }}">
+                <span>📈</span> <span>Inversiones</span>
+            </a>
+            
         </nav>
 
         <div class="mt-auto p-4 border-t border-gray-200 dark:border-gray-800">

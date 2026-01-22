@@ -30,14 +30,19 @@
 
             <div class="overflow-x-auto">
                 @php
-                    $totalMonthlyInstallments = $debts->where('active', true)->sum('installment_amount');
+                    $activos = $debts->where('active', true);
 
-                    $totalRemaining = $debts->where('active', true)->sum(function($d) {
+                    $totalMonthlyInstallments = $activos->sum('installment_amount');
+
+                    $totalRemaining = $activos->sum(function($d) {
                         $restan = $d->installments_total - $d->installments_paid;
                         if ($restan < 0) $restan = 0;
                         return $restan * $d->installment_amount;
                     });
+
+                    $totalDebtsAmount = $activos->sum('total_amount');
                 @endphp
+
                 <table class="min-w-full text-sm">
                     <thead class="bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300">
                         <tr>
@@ -46,6 +51,10 @@
                             <th class="text-left font-medium px-4 sm:px-6 py-3">Próx.</th>
                             <th class="text-left font-medium px-4 sm:px-6 py-3">Pagadas</th>
                             <th class="text-left font-medium px-4 sm:px-6 py-3">Restan</th>
+
+                            {{-- ✅ NUEVA COLUMNA --}}
+                            <th class="text-right font-medium px-4 sm:px-6 py-3">Total</th>
+
                             <th class="text-right font-medium px-4 sm:px-6 py-3">Cuota</th>
                             <th class="text-right font-medium px-4 sm:px-6 py-3 w-72">Acciones</th>
                         </tr>
@@ -88,6 +97,11 @@
                                     {{ $restan }}
                                 </td>
 
+                                {{-- ✅ Total deuda --}}
+                                <td class="px-4 sm:px-6 py-3 text-right font-semibold">
+                                    ${{ number_format($d->total_amount, 2, ',', '.') }}
+                                </td>
+
                                 <td class="px-4 sm:px-6 py-3 text-right font-semibold">
                                     ${{ number_format($d->installment_amount, 2, ',', '.') }}
                                 </td>
@@ -121,22 +135,35 @@
                             </tr>
                         @empty
                             <tr>
-                                <td class="px-4 sm:px-6 py-6 text-center text-gray-500 dark:text-gray-400" colspan="7">
+                                <td class="px-4 sm:px-6 py-6 text-center text-gray-500 dark:text-gray-400" colspan="8">
                                     No tenés deudas cargadas todavía.
                                 </td>
                             </tr>
                         @endforelse
+
+                        {{-- ✅ Footer de totales --}}
                         <tr class="bg-gray-50 dark:bg-gray-800/30">
                             <td class="px-4 sm:px-6 py-3 font-semibold" colspan="5">
-                                TOTAL CUOTAS (activos) · Restante estimado: ${{ number_format($totalRemaining, 2, ',', '.') }}
+                                TOTALES (activos)
                             </td>
+
+                            {{-- Total (sum total_amount) --}}
+                            <td class="px-4 sm:px-6 py-3 text-right font-bold">
+                                ${{ number_format($totalDebtsAmount, 2, ',', '.') }}
+                            </td>
+
+                            {{-- Cuota (sum installment_amount) --}}
                             <td class="px-4 sm:px-6 py-3 text-right font-bold">
                                 ${{ number_format($totalMonthlyInstallments, 2, ',', '.') }}
                             </td>
-                            <td class="px-4 sm:px-6 py-3"></td>
+
+                            <td class="px-4 sm:px-6 py-3 text-right text-xs text-gray-500 dark:text-gray-400">
+                                Restante estimado: ${{ number_format($totalRemaining, 2, ',', '.') }}
+                            </td>
                         </tr>
                     </tbody>
                 </table>
+
             </div>
         </div>
 

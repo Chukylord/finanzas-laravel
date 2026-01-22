@@ -36,15 +36,17 @@ class DebtController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'category_id'         => 'required|exists:categories,id',
-            'name'                => 'required|string|max:120',
-            'type'                => 'required|in:loan,card_installment',
-            'total_amount'        => 'required|numeric|min:0',
-            'installments_total'  => 'required|integer|min:1|max:600',
-            'installment_amount'  => 'required|numeric|min:0',
-            'day_of_month'        => 'required|integer|min:1|max:28',
+            'category_id' => 'required|exists:categories,id',
+            'name' => 'required|string|max:120',
+            'type' => 'required|in:loan,card_installment',
+            'total_amount' => 'required|numeric|min:0',
+            'installments_total' => 'required|integer|min:1|max:600',
+            'installments_paid' => 'nullable|integer|min:0|max:600',
+            'installment_amount' => 'required|numeric|min:0',
+            'day_of_month' => 'required|integer|min:1|max:28',
         ]);
 
+        // Seguridad: categoría del usuario y tipo expense
         $catOk = Category::where('id', $request->category_id)
             ->where('user_id', Auth::id())
             ->where('type', 'expense')
@@ -54,26 +56,34 @@ class DebtController extends Controller
             return back()->withErrors(['category_id' => 'Categoría inválida'])->withInput();
         }
 
-        // Próximo vencimiento automático
-        $today = Carbon::today();
-        $next = Carbon::now()->startOfMonth()->addDays((int)$request->day_of_month - 1);
+        $total = (int) $request->installments_total;
+        $paid  = (int) ($request->installments_paid ?? 0);
 
+        if ($paid > $total) {
+            return back()->withErrors(['installments_paid' => 'Las cuotas pagadas no pueden ser mayores a las cuotas totales.'])->withInput();
+        }
+
+        // Próximo vencimiento: calculado desde el mes actual (como lo venías haciendo)
+        $today = Carbon::today();
+        $next = Carbon::now()->startOfMonth()->addDays(((int)$request->day_of_month) - 1);
         if ($next->lt($today)) {
             $next = $next->addMonth();
         }
 
+        $active = $paid < $total;
+
         Debt::create([
-            'user_id'            => Auth::id(),
-            'category_id'        => $request->category_id,
-            'name'               => $request->name,
-            'type'               => $request->type,
-            'total_amount'       => $request->total_amount,
-            'installments_total' => $request->installments_total,
-            'installments_paid'  => 0,
+            'user_id' => Auth::id(),
+            'category_id' => $request->category_id,
+            'name' => $request->name,
+            'type' => $request->type,
+            'total_amount' => $request->total_amount,
+            'installments_total' => $total,
+            'installments_paid' => $paid,
             'installment_amount' => $request->installment_amount,
-            'day_of_month'       => $request->day_of_month,
-            'next_due_date'      => $next->toDateString(),
-            'active'             => true,
+            'day_of_month' => $request->day_of_month,
+            'next_due_date' => $next->toDateString(),
+            'active' => $active,
         ]);
 
         return redirect()->route('debts.index')->with('ok', 'Deuda creada');

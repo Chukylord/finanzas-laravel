@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'iol' => [
+        'base_url' => env('IOL_BASE_URL', 'https://api.invertironline.com'),
+        'api_token' => env('IOL_API_TOKEN'),
+    ],
+
 ];
