@@ -59,6 +59,10 @@
             <a class="{{ $link }} {{ request()->routeIs('investments.*') ? $active : '' }}" href="{{ route('investments.index') }}">
                 <span>📈</span> <span>Inversiones</span>
             </a>
+
+            <a class="{{ $link }} {{ request()->routeIs('reports.*') ? $active : '' }}" href="{{ route('reports.index') }}">
+                <span>📈</span> <span>Informes</span>
+            </a>
             
         </nav>
 

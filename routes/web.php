@@ -16,6 +16,7 @@ use App\Http\Controllers\SignalRuleController;
 use App\Http\Controllers\InvestmentAccountController;
 use App\Http\Controllers\InvestmentMovementController;
 use App\Http\Controllers\ExchangeRateController;
+use App\Http\Controllers\ReportController;
 
 
 Route::get('/', function () {
@@ -70,6 +71,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/exchange-rates', [ExchangeRateController::class, 'store'])->name('exchange-rates.store');
     Route::delete('/exchange-rates/{exchange_rate}', [ExchangeRateController::class, 'destroy'])->name('exchange-rates.destroy');
 
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 });
 
 require __DIR__.'/auth.php';
