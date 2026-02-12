@@ -5,6 +5,7 @@ use App\Models\PriceSnapshot;
 use App\Models\User;
 use App\Models\WatchlistItem;
 use App\Services\IolClient;
+use Illuminate\Support\Facades\Auth;
 
 it('muestra recomendaciones de compra/venta usando cotizaciones de IOL', function () {
     $user = User::factory()->create();
@@ -41,7 +42,10 @@ it('muestra recomendaciones de compra/venta usando cotizaciones de IOL', functio
 
     app()->instance(IolClient::class, $mock);
 
-    $response = $this->actingAs($user)->get('/markets');
+    $this->withSession([]);
+    Auth::login($user);
+
+    $response = $this->get('/markets');
 
     $response->assertOk();
     $response->assertSee('Recomendaciones IOL', false);
