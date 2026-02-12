@@ -46,11 +46,11 @@
     </div>
 
     {{-- Columna derecha (formulario) --}}
-    <div class="w-full lg:w-1/2 flex items-center justify-center p-6">
-        <div class="w-full max-w-md">
-            <div class="bg-white dark:bg-gray-900 shadow-xl rounded-2xl p-6 border border-gray-100 dark:border-gray-800">
+    <div class="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-10">
+        <div class="w-full max-w-2xl">
+            <div class="bg-white dark:bg-gray-900 shadow-xl rounded-2xl p-8 sm:p-10 border border-gray-100 dark:border-gray-800">
                 <div class="mb-6">
-                    <div class="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+                    <div class="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-gray-100">
                         {{ $title ?? 'Bienvenido' }}
                     </div>
                     <div class="text-sm text-gray-500 dark:text-gray-400">
