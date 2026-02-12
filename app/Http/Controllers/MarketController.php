@@ -5,11 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\WatchlistItem;
 use App\Models\PriceSnapshot;
 use App\Models\Signal;
+use App\Services\MarketRecommendationService;
 use Illuminate\Support\Facades\Auth;
 
 class MarketController extends Controller
 {
-    public function index()
+    public function index(MarketRecommendationService $recommendationService)
     {
         $watchlist = WatchlistItem::with('instrument')
             ->where('user_id', Auth::id())
@@ -26,6 +27,8 @@ class MarketController extends Controller
             $lastPrices[$w->instrument_id] = $last;
         }
 
+        $marketData = $recommendationService->forWatchlist($watchlist);
+
         // últimas señales del usuario (si ya existen)
         $signals = Signal::with('instrument')
             ->where('user_id', Auth::id())
@@ -33,6 +36,12 @@ class MarketController extends Controller
             ->limit(10)
             ->get();
 
-        return view('markets.index', compact('watchlist', 'lastPrices', 'signals'));
+        return view('markets.index', [
+            'watchlist' => $watchlist,
+            'lastPrices' => $lastPrices,
+            'signals' => $signals,
+            'recommendations' => $marketData['recommendations'],
+            'marketWarnings' => $marketData['warnings'],
+        ]);
     }
 }

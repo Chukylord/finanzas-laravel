@@ -94,7 +94,51 @@
             @endif
         </div>
 
-        {{-- Últimas señales --}}
+
+        @if(!empty($marketWarnings))
+            <div class="px-4 py-3 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-sm space-y-1">
+                @foreach($marketWarnings as $warning)
+                    <div>{{ $warning }}</div>
+                @endforeach
+            </div>
+        @endif
+
+        {{-- Recomendaciones IOL --}}
+        <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm p-5">
+            <h2 class="font-semibold mb-3">Recomendaciones IOL (short / long)</h2>
+
+            @if(empty($recommendations))
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    No hay datos suficientes para recomendar. Agregá instrumentos y corré la sincronización de precios.
+                </p>
+            @else
+                <div class="space-y-2">
+                    @foreach($recommendations as $rec)
+                        <div class="p-3 rounded-xl border border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3">
+                            <div>
+                                <div class="font-medium">{{ $rec['instrument']->symbol }} · {{ strtoupper($rec['horizon']) }}</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">{{ $rec['reason'] }}</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">
+                                    Precio: ${{ number_format($rec['price'], 2, ',', '.') }} · Variación: {{ number_format($rec['change_pct'], 2, ',', '.') }}% · Fuente: {{ $rec['source'] }}
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <span class="px-2 py-1 rounded-full text-xs
+                                    {{ $rec['action']=='buy' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200' : '' }}
+                                    {{ $rec['action']=='sell' ? 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200' : '' }}
+                                    {{ $rec['action']=='hold' ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200' : '' }}
+                                ">
+                                    {{ $rec['action']=='buy' ? 'COMPRAR' : ($rec['action']=='sell' ? 'VENDER' : 'MANTENER') }}
+                                </span>
+                                <span class="text-sm font-semibold">{{ $rec['score'] }}/100</span>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+
+                {{-- Últimas señales --}}
         <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm p-5">
             <h2 class="font-semibold mb-3">Últimas señales (demo)</h2>
 
