@@ -1,20 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex items-center justify-between gap-3">
-            <span class="text-lg">Egresos</span>
-            <a href="{{ route('expenses.create') }}" class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-black">
-                + Cargar egreso
-            </a>
-        </div>
+        <span class="text-lg">Egresos</span>
     </x-slot>
-
-    @php
-        $months = [
-            1=>'Enero', 2=>'Febrero', 3=>'Marzo', 4=>'Abril', 5=>'Mayo', 6=>'Junio',
-            7=>'Julio', 8=>'Agosto', 9=>'Septiembre', 10=>'Octubre', 11=>'Noviembre', 12=>'Diciembre'
-        ];
-        $totalExpenseList = $expenses->sum('amount');
-    @endphp
 
     <div class="space-y-4">
 
@@ -23,21 +10,28 @@
                 {{ session('ok') }}
             </div>
         @endif
-        @if(session('error'))
-            <div class="px-4 py-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-100">
-                {{ session('error') }}
-            </div>
-        @endif
 
-        {{-- Filtro mes/año --}}
+        <div class="flex items-center justify-between gap-3">
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+                Listado de egresos registrados.
+            </div>
+
+            <a href="{{ route('expenses.create') }}"
+               class="inline-flex items-center px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-black">
+                + Nuevo egreso
+            </a>
+        </div>
+
+        {{-- Filtros --}}
         <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm p-4">
             <form method="GET" action="{{ route('expenses.index') }}" class="flex flex-wrap gap-3 items-end">
+
                 <div>
                     <label class="block text-sm mb-1 text-gray-600 dark:text-gray-300">Mes</label>
                     <select name="month" class="rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900">
                         @for($m=1; $m<=12; $m++)
                             <option value="{{ $m }}" {{ (int)$month === $m ? 'selected' : '' }}>
-                                {{ $months[$m] }}
+                                {{ str_pad($m, 2, '0', STR_PAD_LEFT) }}
                             </option>
                         @endfor
                     </select>
@@ -45,26 +39,43 @@
 
                 <div>
                     <label class="block text-sm mb-1 text-gray-600 dark:text-gray-300">Año</label>
-                    <input type="number" name="year"
-                           class="rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900 w-28"
-                           value="{{ $year }}">
+                    <input type="number" name="year" value="{{ $year }}"
+                           class="rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900 w-28">
+                </div>
+
+                <div class="min-w-[220px]">
+                    <label class="block text-sm mb-1 text-gray-600 dark:text-gray-300">Categoría</label>
+                    <select name="category_id" class="w-full rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                        <option value="">Todas</option>
+                        @foreach($categories as $category)
+                            <option value="{{ $category->id }}" {{ (string)$categoryId === (string)$category->id ? 'selected' : '' }}>
+                                {{ $category->name }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
 
                 <button class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-black">
-                    Ver
+                    Filtrar
                 </button>
 
                 <a href="{{ route('expenses.index') }}"
                    class="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm">
-                    Mes actual
+                    Limpiar
                 </a>
-
-                <div class="ml-auto text-sm text-gray-500 dark:text-gray-400">
-                    Total: <span class="font-semibold text-gray-900 dark:text-gray-100">${{ number_format($totalExpenseList, 2, ',', '.') }}</span>
-                    <span class="mx-2">·</span>
-                    {{ $months[(int)$month] ?? $month }}/{{ $year }}
-                </div>
             </form>
+        </div>
+
+        {{-- Resumen --}}
+        <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Total filtrado</p>
+                    <p class="mt-1 text-2xl font-semibold">
+                        ${{ number_format($totalExpense, 2, ',', '.') }}
+                    </p>
+                </div>
+            </div>
         </div>
 
         {{-- Tabla --}}
@@ -76,65 +87,55 @@
                             <th class="text-left font-medium px-4 sm:px-6 py-3">Fecha</th>
                             <th class="text-left font-medium px-4 sm:px-6 py-3">Categoría</th>
                             <th class="text-left font-medium px-4 sm:px-6 py-3">Detalle</th>
-                            <th class="text-left font-medium px-4 sm:px-6 py-3">Método</th>
                             <th class="text-right font-medium px-4 sm:px-6 py-3">Monto</th>
-                            <th class="text-right font-medium px-4 sm:px-6 py-3 w-44">Acciones</th>
+                            <th class="text-right font-medium px-4 sm:px-6 py-3">Acciones</th>
                         </tr>
                     </thead>
 
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                        @forelse($expenses as $e)
+                        @forelse($expenses as $expense)
                             <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40">
                                 <td class="px-4 sm:px-6 py-3">
-                                    {{ \Carbon\Carbon::parse($e->date)->format('d/m/Y') }}
+                                    {{ \Carbon\Carbon::parse($expense->date)->format('d/m/Y') }}
                                 </td>
+
                                 <td class="px-4 sm:px-6 py-3">
-                                    {{ $e->category?->name ?? '-' }}
+                                    {{ $expense->category?->name ?? '—' }}
                                 </td>
-                                <td class="px-4 sm:px-6 py-3 text-gray-600 dark:text-gray-300">
-                                    {{ $e->description ?: '-' }}
-                                </td>
+
                                 <td class="px-4 sm:px-6 py-3">
-                                    <span class="px-2 py-1 rounded-lg text-xs bg-gray-100 dark:bg-gray-800">
-                                        {{ $e->method ?: 'manual' }}
-                                    </span>
+                                    {{ $expense->description }}
                                 </td>
+
                                 <td class="px-4 sm:px-6 py-3 text-right font-semibold">
-                                    ${{ number_format($e->amount, 2, ',', '.') }}
+                                    ${{ number_format($expense->amount, 2, ',', '.') }}
                                 </td>
+
                                 <td class="px-4 sm:px-6 py-3 text-right">
-                                    <div class="inline-flex gap-3 justify-end">
-                                        <a class="text-blue-700 hover:underline"
-                                           href="{{ route('expenses.edit', $e) }}?month={{ $month }}&year={{ $year }}">
+                                    <div class="inline-flex gap-2">
+                                        <a href="{{ route('expenses.edit', $expense) }}"
+                                           class="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800">
                                             Editar
                                         </a>
 
-                                        <form action="{{ route('expenses.destroy', $e) }}" method="POST"
+                                        <form action="{{ route('expenses.destroy', $expense) }}" method="POST"
                                               onsubmit="return confirm('¿Eliminar egreso?')">
                                             @csrf
                                             @method('DELETE')
-                                            <button class="text-rose-700 hover:underline">Eliminar</button>
+                                            <button class="px-3 py-1.5 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20">
+                                                Eliminar
+                                            </button>
                                         </form>
                                     </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="px-4 sm:px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                                    No hay egresos para este mes.
+                                <td colspan="5" class="px-4 sm:px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                                    No hay egresos para los filtros seleccionados.
                                 </td>
                             </tr>
                         @endforelse
-
-                        @if($expenses->count() > 0)
-                            <tr class="bg-gray-50 dark:bg-gray-800/30">
-                                <td class="px-4 sm:px-6 py-3 font-semibold" colspan="4">TOTAL</td>
-                                <td class="px-4 sm:px-6 py-3 text-right font-bold">
-                                    ${{ number_format($totalExpenseList, 2, ',', '.') }}
-                                </td>
-                                <td class="px-4 sm:px-6 py-3"></td>
-                            </tr>
-                        @endif
                     </tbody>
                 </table>
             </div>

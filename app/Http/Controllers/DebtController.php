@@ -11,16 +11,26 @@ use Carbon\Carbon;
 
 class DebtController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $categoryId = $request->get('category_id');
+
+        $categories = Category::where('user_id', Auth::id())
+            ->where('type', 'expense')
+            ->orderBy('name')
+            ->get();
+
         $debts = Debt::with('category')
             ->where('user_id', Auth::id())
+            ->when($categoryId, function ($query) use ($categoryId) {
+                $query->where('category_id', $categoryId);
+            })
             ->orderBy('active', 'desc')
             ->orderBy('next_due_date')
             ->orderBy('name')
             ->get();
 
-        return view('debts.index', compact('debts'));
+        return view('debts.index', compact('debts', 'categories', 'categoryId'));
     }
 
     public function create()
@@ -46,7 +56,6 @@ class DebtController extends Controller
             'day_of_month' => 'required|integer|min:1|max:28',
         ]);
 
-        // Seguridad: categoría del usuario y tipo expense
         $catOk = Category::where('id', $request->category_id)
             ->where('user_id', Auth::id())
             ->where('type', 'expense')
@@ -63,7 +72,6 @@ class DebtController extends Controller
             return back()->withErrors(['installments_paid' => 'Las cuotas pagadas no pueden ser mayores a las cuotas totales.'])->withInput();
         }
 
-        // Próximo vencimiento: calculado desde el mes actual (como lo venías haciendo)
         $today = Carbon::today();
         $next = Carbon::now()->startOfMonth()->addDays(((int)$request->day_of_month) - 1);
         if ($next->lt($today)) {
@@ -126,7 +134,6 @@ class DebtController extends Controller
             return back()->withErrors(['category_id' => 'Categoría inválida'])->withInput();
         }
 
-        // Próximo vencimiento automático (evitar pasado)
         $today = Carbon::today();
         $next = Carbon::parse($debt->next_due_date)->startOfMonth()->addDays((int)$request->day_of_month - 1);
 
@@ -163,7 +170,6 @@ class DebtController extends Controller
         return redirect()->route('debts.index')->with('ok', 'Deuda eliminada');
     }
 
-    // Botón: Pagar cuota (crea egreso + avanza next_due_date)
     public function payInstallment(Debt $debt)
     {
         if ($debt->user_id != Auth::id()) abort(403);

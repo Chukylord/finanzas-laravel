@@ -50,6 +50,8 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('instruments', InstrumentController::class)->except(['show']);
     Route::post('/watchlist/{instrument}/toggle', [WatchlistController::class, 'toggle'])->name('watchlist.toggle');
     Route::patch('/watchlist/{watchlistItem}/horizon', [WatchlistController::class, 'updateHorizon'])->name('watchlist.horizon');
+    Route::post('/watchlist/bulk', [\App\Http\Controllers\WatchlistController::class, 'bulk'])
+        ->name('watchlist.bulk');
 
     Route::resource('signal-rules', SignalRuleController::class)->except(['show']);
 

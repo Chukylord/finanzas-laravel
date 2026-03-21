@@ -11,16 +11,27 @@ use Carbon\Carbon;
 
 class RecurringController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $userId = Auth::id();
+        $categoryId = $request->get('category_id');
+
+        $categories = Category::where('user_id', $userId)
+            ->where('type', 'expense')
+            ->orderBy('name')
+            ->get();
+
         $recurrings = Recurring::with('category')
-            ->where('user_id', Auth::id())
+            ->where('user_id', $userId)
+            ->when($categoryId, function ($query) use ($categoryId) {
+                $query->where('category_id', $categoryId);
+            })
             ->orderBy('active', 'desc')
             ->orderBy('next_date')
             ->orderBy('name')
             ->get();
 
-        return view('recurrings.index', compact('recurrings'));
+        return view('recurrings.index', compact('recurrings', 'categories', 'categoryId'));
     }
 
     public function create()
@@ -43,7 +54,6 @@ class RecurringController extends Controller
             'day_of_month' => 'required|integer|min:1|max:28',
         ]);
 
-        // Seguridad: la categoría debe ser del usuario y tipo expense
         $catOk = Category::where('id', $request->category_id)
             ->where('user_id', Auth::id())
             ->where('type', 'expense')
@@ -53,9 +63,8 @@ class RecurringController extends Controller
             return back()->withErrors(['category_id' => 'Categoría inválida'])->withInput();
         }
 
-        // Próxima fecha automática (según día del mes)
         $today = Carbon::today();
-        $next = Carbon::now()->startOfMonth()->addDays((int)$request->day_of_month - 1);
+        $next = Carbon::now()->startOfMonth()->addDays((int) $request->day_of_month - 1);
 
         if ($next->lt($today)) {
             $next = $next->addMonth();
@@ -100,7 +109,6 @@ class RecurringController extends Controller
             'active'       => 'nullable',
         ]);
 
-        // Seguridad: categoría del usuario + expense
         $catOk = Category::where('id', $request->category_id)
             ->where('user_id', Auth::id())
             ->where('type', 'expense')
@@ -110,9 +118,8 @@ class RecurringController extends Controller
             return back()->withErrors(['category_id' => 'Categoría inválida'])->withInput();
         }
 
-        // Recalcular próxima fecha automática (y evitar pasado)
         $today = Carbon::today();
-        $next = Carbon::parse($recurring->next_date)->startOfMonth()->addDays((int)$request->day_of_month - 1);
+        $next = Carbon::parse($recurring->next_date)->startOfMonth()->addDays((int) $request->day_of_month - 1);
 
         if ($next->lt($today)) {
             $next = $next->addMonth();
@@ -139,7 +146,6 @@ class RecurringController extends Controller
         return redirect()->route('recurrings.index')->with('ok', 'Recurrente eliminado');
     }
 
-    // Botón: Generar egreso y avanzar próxima fecha
     public function generateExpense(Recurring $recurring)
     {
         if ($recurring->user_id != Auth::id()) abort(403);

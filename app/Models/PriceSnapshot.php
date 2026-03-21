@@ -12,6 +12,7 @@ class PriceSnapshot extends Model
 
     protected $casts = [
         'date' => 'date',
+        'fetched_at' => 'datetime',
     ];
 
     public function instrument()

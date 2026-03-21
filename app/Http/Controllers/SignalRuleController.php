@@ -2,63 +2,98 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\SignalRule;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class SignalRuleController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
-        //
+        $rules = SignalRule::where('user_id', Auth::id())
+            ->orderBy('active', 'desc')
+            ->orderBy('horizon')
+            ->orderBy('name')
+            ->get();
+
+        return view('signal-rules.index', compact('rules'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
     public function create()
     {
-        //
+        return view('signal-rules.create');
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        //
+        $data = $request->validate([
+            'name' => 'required|string|max:120',
+            'horizon' => 'required|in:short,medium,long',
+            'fast_ma' => 'required|integer|min:2|max:500',
+            'slow_ma' => 'required|integer|min:2|max:500',
+            'active' => 'nullable',
+        ]);
+
+        if ((int)$data['fast_ma'] >= (int)$data['slow_ma']) {
+            return back()
+                ->withErrors(['fast_ma' => 'La rápida debe ser menor que la lenta (ej: 20 y 50).'])
+                ->withInput();
+        }
+
+        SignalRule::create([
+            'user_id' => Auth::id(),
+            'name' => $data['name'],
+            'horizon' => $data['horizon'],
+            'fast_ma' => $data['fast_ma'],
+            'slow_ma' => $data['slow_ma'],
+            'active' => $request->has('active'),
+        ]);
+
+        return redirect()->route('signal-rules.index')->with('ok', 'Regla creada');
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function edit(SignalRule $signal_rule)
     {
-        //
+        if ($signal_rule->user_id != Auth::id()) abort(403);
+
+        return view('signal-rules.edit', ['rule' => $signal_rule]);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
+    public function update(Request $request, SignalRule $signal_rule)
     {
-        //
+        if ($signal_rule->user_id != Auth::id()) abort(403);
+
+        $data = $request->validate([
+            'name' => 'required|string|max:120',
+            'horizon' => 'required|in:short,medium,long',
+            'fast_ma' => 'required|integer|min:2|max:500',
+            'slow_ma' => 'required|integer|min:2|max:500',
+            'active' => 'nullable',
+        ]);
+
+        if ((int)$data['fast_ma'] >= (int)$data['slow_ma']) {
+            return back()
+                ->withErrors(['fast_ma' => 'La rápida debe ser menor que la lenta (ej: 20 y 50).'])
+                ->withInput();
+        }
+
+        $signal_rule->update([
+            'name' => $data['name'],
+            'horizon' => $data['horizon'],
+            'fast_ma' => $data['fast_ma'],
+            'slow_ma' => $data['slow_ma'],
+            'active' => $request->has('active'),
+        ]);
+
+        return redirect()->route('signal-rules.index')->with('ok', 'Regla actualizada');
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function destroy(SignalRule $signal_rule)
     {
-        //
-    }
+        if ($signal_rule->user_id != Auth::id()) abort(403);
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        $signal_rule->delete();
+
+        return redirect()->route('signal-rules.index')->with('ok', 'Regla eliminada');
     }
 }

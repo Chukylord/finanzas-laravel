@@ -12,23 +12,62 @@ class InstrumentController extends Controller
     public function index(Request $request)
     {
         $q = trim((string) $request->get('q', ''));
+        $type = trim((string) $request->get('type', ''));
+        $only = trim((string) $request->get('only', '')); // watchlist | not | ''
+        $activeOnly = $request->boolean('active');
 
-        $instruments = Instrument::query()
-            ->when($q, function ($query) use ($q) {
-                $query->where('symbol', 'like', "%{$q}%")
-                    ->orWhere('name', 'like', "%{$q}%")
-                    ->orWhere('market', 'like', "%{$q}%");
-            })
-            ->orderBy('active', 'desc')
-            ->orderBy('type')
-            ->orderBy('symbol')
-            ->get();
+        $userId = Auth::id();
 
-        $watchIds = WatchlistItem::where('user_id', Auth::id())
+        // watchlist del user (map rápido para la vista)
+        $watchIds = WatchlistItem::where('user_id', $userId)
             ->pluck('instrument_id')
             ->toArray();
 
-        return view('instruments.index', compact('instruments', 'q', 'watchIds'));
+        $watchMap = array_fill_keys($watchIds, true);
+
+        $instrumentsQ = Instrument::query();
+
+        if ($q !== '') {
+            $instrumentsQ->where(function ($query) use ($q) {
+                $query->where('symbol', 'like', "%{$q}%")
+                    ->orWhere('name', 'like', "%{$q}%")
+                    ->orWhere('market', 'like', "%{$q}%");
+            });
+        }
+
+        if ($type !== '') {
+            $instrumentsQ->where('type', $type);
+        }
+
+        if ($activeOnly) {
+            $instrumentsQ->where('active', true);
+        }
+
+        // Filtro watchlist / no watchlist
+        if ($only === 'watchlist') {
+            $instrumentsQ->whereIn('id', $watchIds ?: [0]);
+        } elseif ($only === 'not') {
+            if (count($watchIds) > 0) {
+                $instrumentsQ->whereNotIn('id', $watchIds);
+            }
+        }
+
+        $instruments = $instrumentsQ
+            ->orderBy('active', 'desc')
+            ->orderBy('type')
+            ->orderBy('symbol')
+            ->paginate(50)
+            ->withQueryString();
+
+        return view('instruments.index', [
+            'instruments' => $instruments,
+            'q' => $q,
+            'type' => $type,
+            'only' => $only,
+            'activeOnly' => $activeOnly,
+            'watchIds' => $watchIds,
+            'watchMap' => $watchMap,
+        ]);
     }
 
     public function create()
@@ -89,7 +128,6 @@ class InstrumentController extends Controller
 
     public function destroy(Instrument $instrument)
     {
-        // Si está en watchlists, no lo borramos (para evitar problemas)
         $inUse = WatchlistItem::where('instrument_id', $instrument->id)->exists();
         if ($inUse) {
             return redirect()->route('instruments.index')

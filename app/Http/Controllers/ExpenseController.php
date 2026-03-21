@@ -12,20 +12,38 @@ class ExpenseController extends Controller
 {
     public function index(Request $request)
     {
-        $month = (int) ($request->get('month', now()->month));
-        $year  = (int) ($request->get('year', now()->year));
+        $userId = Auth::id();
 
-        $start = Carbon::create($year, $month, 1)->startOfMonth()->toDateString();
-        $end   = Carbon::create($year, $month, 1)->endOfMonth()->toDateString();
+        $month = (int) $request->get('month', now()->month);
+        $year = (int) $request->get('year', now()->year);
+        $categoryId = $request->get('category_id');
+
+        $categories = Category::where('user_id', $userId)
+            ->where('type', 'expense')
+            ->orderBy('name')
+            ->get();
 
         $expenses = Expense::with('category')
-            ->where('user_id', Auth::id())
-            ->whereBetween('date', [$start, $end])
+            ->where('user_id', $userId)
+            ->whereYear('date', $year)
+            ->whereMonth('date', $month)
+            ->when($categoryId, function ($query) use ($categoryId) {
+                $query->where('category_id', $categoryId);
+            })
             ->orderBy('date', 'desc')
             ->orderBy('id', 'desc')
             ->get();
 
-        return view('expenses.index', compact('expenses', 'month', 'year'));
+        $totalExpense = $expenses->sum('amount');
+
+        return view('expenses.index', compact(
+            'expenses',
+            'categories',
+            'month',
+            'year',
+            'categoryId',
+            'totalExpense'
+        ));
     }
 
     public function create()

@@ -22,6 +22,32 @@
             </a>
         </div>
 
+        {{-- Filtros --}}
+        <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm p-4">
+            <form method="GET" action="{{ route('debts.index') }}" class="flex flex-wrap gap-3 items-end">
+                <div class="min-w-[260px]">
+                    <label class="block text-sm mb-1 text-gray-600 dark:text-gray-300">Categoría</label>
+                    <select name="category_id" class="w-full rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                        <option value="">Todas</option>
+                        @foreach($categories as $cat)
+                            <option value="{{ $cat->id }}" {{ (string)$categoryId === (string)$cat->id ? 'selected' : '' }}>
+                                {{ $cat->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <button class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-black">
+                    Filtrar
+                </button>
+
+                <a href="{{ route('debts.index') }}"
+                   class="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm">
+                    Limpiar
+                </a>
+            </form>
+        </div>
+
         <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden">
             <div class="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
                 <h2 class="font-semibold">Listado</h2>
@@ -51,10 +77,7 @@
                             <th class="text-left font-medium px-4 sm:px-6 py-3">Próx.</th>
                             <th class="text-left font-medium px-4 sm:px-6 py-3">Pagadas</th>
                             <th class="text-left font-medium px-4 sm:px-6 py-3">Restan</th>
-
-                            {{-- ✅ NUEVA COLUMNA --}}
                             <th class="text-right font-medium px-4 sm:px-6 py-3">Total</th>
-
                             <th class="text-right font-medium px-4 sm:px-6 py-3">Cuota</th>
                             <th class="text-right font-medium px-4 sm:px-6 py-3 w-72">Acciones</th>
                         </tr>
@@ -97,7 +120,6 @@
                                     {{ $restan }}
                                 </td>
 
-                                {{-- ✅ Total deuda --}}
                                 <td class="px-4 sm:px-6 py-3 text-right font-semibold">
                                     ${{ number_format($d->total_amount, 2, ',', '.') }}
                                 </td>
@@ -136,23 +158,20 @@
                         @empty
                             <tr>
                                 <td class="px-4 sm:px-6 py-6 text-center text-gray-500 dark:text-gray-400" colspan="8">
-                                    No tenés deudas cargadas todavía.
+                                    No tenés deudas cargadas para el filtro seleccionado.
                                 </td>
                             </tr>
                         @endforelse
 
-                        {{-- ✅ Footer de totales --}}
                         <tr class="bg-gray-50 dark:bg-gray-800/30">
                             <td class="px-4 sm:px-6 py-3 font-semibold" colspan="5">
                                 TOTALES (activos)
                             </td>
 
-                            {{-- Total (sum total_amount) --}}
                             <td class="px-4 sm:px-6 py-3 text-right font-bold">
                                 ${{ number_format($totalDebtsAmount, 2, ',', '.') }}
                             </td>
 
-                            {{-- Cuota (sum installment_amount) --}}
                             <td class="px-4 sm:px-6 py-3 text-right font-bold">
                                 ${{ number_format($totalMonthlyInstallments, 2, ',', '.') }}
                             </td>

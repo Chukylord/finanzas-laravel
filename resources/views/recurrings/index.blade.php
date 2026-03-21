@@ -22,6 +22,33 @@
             </a>
         </div>
 
+        {{-- Filtros --}}
+        <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm p-4">
+            <form method="GET" action="{{ route('recurrings.index') }}" class="flex flex-wrap gap-3 items-end">
+                <div class="min-w-[240px]">
+                    <label class="block text-sm mb-1 text-gray-600 dark:text-gray-300">Categoría</label>
+                    <select name="category_id"
+                            class="w-full rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                        <option value="">Todas</option>
+                        @foreach($categories as $cat)
+                            <option value="{{ $cat->id }}" {{ (string)$categoryId === (string)$cat->id ? 'selected' : '' }}>
+                                {{ $cat->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <button class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-black">
+                    Filtrar
+                </button>
+
+                <a href="{{ route('recurrings.index') }}"
+                   class="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm">
+                    Limpiar
+                </a>
+            </form>
+        </div>
+
         <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden">
             <div class="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
                 <h2 class="font-semibold">Listado</h2>
@@ -108,7 +135,7 @@
                         @empty
                             <tr>
                                 <td class="px-4 sm:px-6 py-6 text-center text-gray-500 dark:text-gray-400" colspan="6">
-                                    No hay recurrentes cargados todavía.
+                                    No hay recurrentes cargados para el filtro seleccionado.
                                 </td>
                             </tr>
                         @endforelse

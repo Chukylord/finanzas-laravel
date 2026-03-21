@@ -10,8 +10,8 @@ use Carbon\Carbon;
 
 class IolSyncPrices extends Command
 {
-    protected $signature = 'iol:sync-prices {--date=}';
-    protected $description = 'Sincroniza precios desde IOL para instrumentos de watchlist';
+    protected $signature = 'iol:sync-prices {--date=} {--debug}';
+    protected $description = 'Sincroniza precios desde IOL para instrumentos de la watchlist';
 
     public function handle(IolClient $iol)
     {
@@ -19,7 +19,9 @@ class IolSyncPrices extends Command
             ? Carbon::parse($this->option('date'))->toDateString()
             : Carbon::today()->toDateString();
 
-        // Traemos instrumentos únicos (evita repetir consultas si el mismo instrumento está varias veces)
+        $debug = (bool) $this->option('debug');
+
+        // En consola NO usamos Auth
         $items = WatchlistItem::with('instrument')->get();
 
         if ($items->count() === 0) {
@@ -27,21 +29,30 @@ class IolSyncPrices extends Command
             return Command::SUCCESS;
         }
 
-        $instruments = $items
-            ->pluck('instrument')
-            ->filter()                 // por si alguno quedó null
-            ->unique('id')
-            ->values();
+        foreach ($items as $item) {
+            $inst = $item->instrument;
 
-        foreach ($instruments as $inst) {
-            $market = $inst->market ?: 'bCBA';   // NO strtolower()
+            if (!$inst) {
+                $this->warn("Item {$item->id} sin instrument asociado");
+                continue;
+            }
+
+            // OJO: si tu tabla instruments guarda "bcba" en minúscula, IOL a veces usa "bCBA"
+            // Si ya te funciona con "bcba", dejalo. Si falla, probá guardarlo como "bCBA".
+            $market = $inst->market ?: 'bCBA';
             $symbol = $inst->symbol;
 
             try {
                 $q = $iol->getQuote($market, $symbol);
 
-                // Ajustá según el JSON real que te devuelva IOL
-                $close = data_get($q, 'ultimoPrecio');
+                // Campos comunes de IOL
+                $close = data_get($q, 'ultimoPrecio',
+                         data_get($q, 'ultimo',
+                         data_get($q, 'precioUltimo', null)));
+
+                if ($debug) {
+                    $this->line("DEBUG {$symbol}: " . json_encode($q, JSON_UNESCAPED_UNICODE));
+                }
 
                 if ($close === null) {
                     $this->warn("Sin precio para {$symbol} ({$market})");
@@ -50,7 +61,7 @@ class IolSyncPrices extends Command
 
                 PriceSnapshot::updateOrCreate(
                     ['instrument_id' => $inst->id, 'date' => $date],
-                    ['close' => $close]
+                    ['close' => (float) $close]
                 );
 
                 $this->info("OK {$symbol} {$date} = {$close}");

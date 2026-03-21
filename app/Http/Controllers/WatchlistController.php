@@ -43,4 +43,50 @@ class WatchlistController extends Controller
 
         return back()->with('ok', 'Horizonte actualizado');
     }
+
+    public function bulk(Request $request)
+    {
+        $data = $request->validate([
+            'action' => 'required|in:add,remove',
+            'instrument_ids' => 'required|array|min:1',
+            'instrument_ids.*' => 'integer',
+            'horizon' => 'nullable|in:short,medium,long',
+        ]);
+
+        $userId = Auth::id();
+        $ids = array_unique($data['instrument_ids']);
+        $action = $data['action'];
+        $horizon = $data['horizon'] ?? 'medium';
+
+        if ($action === 'add') {
+            $rows = [];
+            $now = now();
+
+            foreach ($ids as $id) {
+                $rows[] = [
+                    'user_id' => $userId,
+                    'instrument_id' => $id,
+                    'horizon' => $horizon,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+
+            // evita duplicados
+            WatchlistItem::upsert(
+                $rows,
+                ['user_id', 'instrument_id'],
+                ['horizon', 'updated_at']
+            );
+
+            return back()->with('ok', 'Agregados a tu watchlist: ' . count($ids));
+        }
+
+        // remove
+        WatchlistItem::where('user_id', $userId)
+            ->whereIn('instrument_id', $ids)
+            ->delete();
+
+        return back()->with('ok', 'Quitados de tu watchlist: ' . count($ids));
+    }
 }
