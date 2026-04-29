@@ -25,6 +25,7 @@
         {{-- Filtros --}}
         <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm p-4">
             <form method="GET" action="{{ route('debts.index') }}" class="flex flex-wrap gap-3 items-end">
+
                 <div class="min-w-[260px]">
                     <label class="block text-sm mb-1 text-gray-600 dark:text-gray-300">Categoría</label>
                     <select name="category_id" class="w-full rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900">
@@ -36,6 +37,18 @@
                         @endforeach
                     </select>
                 </div>
+
+                <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                    <input type="checkbox" name="show_finished" value="1" class="rounded"
+                           {{ !empty($showFinished) ? 'checked' : '' }}>
+                    Mostrar finalizadas
+                </label>
+
+                <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                    <input type="checkbox" name="only_last_installment" value="1" class="rounded"
+                           {{ !empty($onlyLastInstallment) ? 'checked' : '' }}>
+                    Solo última cuota
+                </label>
 
                 <button class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-black">
                     Filtrar
@@ -106,6 +119,11 @@
                                             Saldada
                                         </span>
                                     @endif
+                                    @if($d->active && $restan === 1)
+                                        <span class="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
+                                            Última cuota
+                                        </span>
+                                    @endif
                                 </td>
 
                                 <td class="px-4 sm:px-6 py-3">
@@ -165,7 +183,7 @@
 
                         <tr class="bg-gray-50 dark:bg-gray-800/30">
                             <td class="px-4 sm:px-6 py-3 font-semibold" colspan="5">
-                                TOTALES (activos)
+                                TOTALES (activos filtrados)
                             </td>
 
                             <td class="px-4 sm:px-6 py-3 text-right font-bold">

@@ -52,10 +52,44 @@ class InvestmentMovementController extends Controller
         return redirect()->route('investments.movements.index', $investment)->with('ok', 'Movimiento agregado');
     }
 
+    public function edit(InvestmentMovement $movement)
+    {
+        $investment = $movement->account;
+
+        if (!$investment || $investment->user_id != Auth::id()) abort(403);
+
+        return view('investments.movements.edit', compact('investment', 'movement'));
+    }
+
+    public function update(Request $request, InvestmentMovement $movement)
+    {
+        $investment = $movement->account;
+
+        if (!$investment || $investment->user_id != Auth::id()) abort(403);
+
+        $request->validate([
+            'date' => 'required|date',
+            'type' => 'required|in:deposit,withdraw,profit,loss,fee,adjust',
+            'currency' => 'required|in:ARS,USD',
+            'amount' => 'required|numeric|min:0',
+            'description' => 'nullable|string|max:255',
+        ]);
+
+        $movement->update([
+            'date' => $request->date,
+            'type' => $request->type,
+            'currency' => $request->currency,
+            'amount' => $request->amount,
+            'description' => $request->description,
+        ]);
+
+        return redirect()->route('investments.movements.index', $investment)->with('ok', 'Movimiento actualizado');
+    }
+
     public function destroy(InvestmentMovement $movement)
     {
-        // seguridad: verificar dueño por relación
         $account = $movement->account;
+
         if (!$account || $account->user_id != Auth::id()) abort(403);
 
         $movement->delete();

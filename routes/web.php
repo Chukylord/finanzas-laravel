@@ -66,6 +66,12 @@ Route::middleware(['auth'])->group(function () {
     Route::post('investments/{investment}/movements', [InvestmentMovementController::class, 'store'])
         ->name('investments.movements.store');
 
+    Route::get('movements/{movement}/edit', [InvestmentMovementController::class, 'edit'])
+        ->name('movements.edit');
+
+    Route::put('movements/{movement}', [InvestmentMovementController::class, 'update'])
+        ->name('movements.update');
+
     Route::delete('movements/{movement}', [InvestmentMovementController::class, 'destroy'])
         ->name('movements.destroy');
 

@@ -14,6 +14,8 @@ class DebtController extends Controller
     public function index(Request $request)
     {
         $categoryId = $request->get('category_id');
+        $showFinished = $request->boolean('show_finished');
+        $onlyLastInstallment = $request->boolean('only_last_installment');
 
         $categories = Category::where('user_id', Auth::id())
             ->where('type', 'expense')
@@ -25,12 +27,30 @@ class DebtController extends Controller
             ->when($categoryId, function ($query) use ($categoryId) {
                 $query->where('category_id', $categoryId);
             })
+
+            // Por defecto NO mostrar finalizadas
+            ->when(!$showFinished, function ($query) {
+                $query->where('active', true);
+            })
+
+            // Solo las que les queda 1 cuota
+            ->when($onlyLastInstallment, function ($query) {
+                $query->whereRaw('(installments_total - installments_paid) = 1')
+                      ->where('active', true);
+            })
+
             ->orderBy('active', 'desc')
             ->orderBy('next_due_date')
             ->orderBy('name')
             ->get();
 
-        return view('debts.index', compact('debts', 'categories', 'categoryId'));
+        return view('debts.index', compact(
+            'debts',
+            'categories',
+            'categoryId',
+            'showFinished',
+            'onlyLastInstallment'
+        ));
     }
 
     public function create()
@@ -69,11 +89,14 @@ class DebtController extends Controller
         $paid  = (int) ($request->installments_paid ?? 0);
 
         if ($paid > $total) {
-            return back()->withErrors(['installments_paid' => 'Las cuotas pagadas no pueden ser mayores a las cuotas totales.'])->withInput();
+            return back()->withErrors([
+                'installments_paid' => 'Las cuotas pagadas no pueden ser mayores a las cuotas totales.'
+            ])->withInput();
         }
 
         $today = Carbon::today();
         $next = Carbon::now()->startOfMonth()->addDays(((int)$request->day_of_month) - 1);
+
         if ($next->lt($today)) {
             $next = $next->addMonth();
         }
@@ -143,6 +166,12 @@ class DebtController extends Controller
 
         $paid  = (int) $request->installments_paid;
         $total = (int) $request->installments_total;
+
+        if ($paid > $total) {
+            return back()->withErrors([
+                'installments_paid' => 'Las cuotas pagadas no pueden ser mayores a las cuotas totales.'
+            ])->withInput();
+        }
 
         $isActive = $request->has('active') && ($paid < $total);
 

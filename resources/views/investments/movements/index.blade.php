@@ -36,7 +36,8 @@
             </div>
 
             @php
-                $balArs = 0; $balUsd = 0;
+                $balArs = 0;
+                $balUsd = 0;
 
                 foreach($movements as $m) {
                     $signed = in_array($m->type, ['withdraw','loss','fee']) ? -(float)$m->amount : (float)$m->amount;
@@ -63,7 +64,7 @@
                             <th class="text-left font-medium px-4 sm:px-6 py-3">Moneda</th>
                             <th class="text-right font-medium px-4 sm:px-6 py-3">Monto</th>
                             <th class="text-left font-medium px-4 sm:px-6 py-3">Detalle</th>
-                            <th class="text-right font-medium px-4 sm:px-6 py-3 w-40">Acciones</th>
+                            <th class="text-right font-medium px-4 sm:px-6 py-3 w-56">Acciones</th>
                         </tr>
                     </thead>
 
@@ -113,14 +114,21 @@
                                 </td>
 
                                 <td class="px-4 sm:px-6 py-3 text-right">
-                                    <form action="{{ route('movements.destroy', $m) }}" method="POST"
-                                          onsubmit="return confirm('¿Eliminar movimiento?')">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button class="px-3 py-1.5 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20">
-                                            Eliminar
-                                        </button>
-                                    </form>
+                                    <div class="inline-flex gap-2">
+                                        <a href="{{ route('movements.edit', $m) }}"
+                                           class="px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800">
+                                            Editar
+                                        </a>
+
+                                        <form action="{{ route('movements.destroy', $m) }}" method="POST"
+                                              onsubmit="return confirm('¿Eliminar movimiento?')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button class="px-3 py-1.5 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20">
+                                                Eliminar
+                                            </button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
