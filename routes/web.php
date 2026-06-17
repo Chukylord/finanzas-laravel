@@ -72,6 +72,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/exchange-rates', [ExchangeRateController::class, 'store'])->name('exchange-rates.store');
     Route::delete('/exchange-rates/{exchange_rate}', [ExchangeRateController::class, 'destroy'])->name('exchange-rates.destroy');
 
+    Route::get('/reports/export', [ReportController::class, 'export'])->name('reports.export');
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
 });
 

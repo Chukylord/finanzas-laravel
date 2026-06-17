@@ -3,164 +3,355 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
-use App\Models\Income;
 use App\Models\Expense;
-use App\Models\Debt;
-use App\Models\Recurring;
+use App\Models\Income;
+use App\Models\Subcategory;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Carbon\Carbon;
+use Illuminate\Validation\ValidationException;
 
 class ReportController extends Controller
 {
     public function index(Request $request)
     {
-        $today = Carbon::today();
-        $from = $request->input('from', $today->copy()->startOfMonth()->toDateString());
-        $to   = $request->input('to', $today->copy()->endOfMonth()->toDateString());
+        $userId = Auth::id();
+        $filters = $this->resolveFilters($request, $userId);
+        $report = $this->buildReport($filters, $userId);
 
-        // checkboxes: sections[]=incomes&sections[]=expenses...
-        $sections = $request->input('sections', ['incomes', 'expenses']); // default: ingresos+egresos
+        $categories = Category::where('user_id', $userId)
+            ->orderBy('type')
+            ->orderBy('name')
+            ->get();
 
-        // Validación simple
-        $request->validate([
+        $subcategories = Subcategory::with('category')
+            ->where('user_id', $userId)
+            ->orderBy('name')
+            ->get();
+
+        $methods = Income::where('user_id', $userId)
+            ->whereNotNull('method')
+            ->where('method', '!=', '')
+            ->distinct()
+            ->pluck('method')
+            ->merge(
+                Expense::where('user_id', $userId)
+                    ->whereNotNull('method')
+                    ->where('method', '!=', '')
+                    ->distinct()
+                    ->pluck('method')
+            )
+            ->unique()
+            ->sort()
+            ->values();
+
+        $quickFilters = [
+            'current_month' => 'Mes actual',
+            'previous_month' => 'Mes anterior',
+            'last_3_months' => 'Ultimos 3 meses',
+            'current_year' => 'Año actual',
+        ];
+
+        return view('reports.index', array_merge($report, compact(
+            'filters',
+            'categories',
+            'subcategories',
+            'methods',
+            'quickFilters'
+        )));
+    }
+
+    public function export(Request $request)
+    {
+        $userId = Auth::id();
+        $filters = $this->resolveFilters($request, $userId);
+        $report = $this->buildReport($filters, $userId);
+        $filename = 'reporte_finanzas_' . Carbon::today()->toDateString() . '.csv';
+
+        return response()->streamDownload(function () use ($report) {
+            $handle = fopen('php://output', 'w');
+
+            fwrite($handle, "\xEF\xBB\xBF");
+
+            fputcsv($handle, [
+                'Fecha',
+                'Tipo',
+                'Categoría',
+                'Subcategoría',
+                'Descripción',
+                'Método',
+                'Monto',
+            ], ';');
+
+            foreach ($report['movements'] as $movement) {
+                fputcsv($handle, [
+                    $movement['date']->format('Y-m-d'),
+                    $movement['type_label'],
+                    $movement['category'],
+                    $movement['subcategory'],
+                    $movement['description'],
+                    $movement['method'],
+                    number_format((float) $movement['signed_amount'], 2, '.', ''),
+                ], ';');
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    private function resolveFilters(Request $request, int $userId): array
+    {
+        $validated = $request->validate([
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date',
             'from' => 'nullable|date',
-            'to' => 'nullable|date|after_or_equal:from',
-            'sections' => 'nullable|array',
+            'to' => 'nullable|date',
+            'quick' => 'nullable|in:current_month,previous_month,last_3_months,current_year',
+            'preset' => 'nullable|in:current_month,previous_month,last_3_months,current_year',
+            'movement_type' => 'nullable|in:all,income,expense',
+            'category_id' => 'nullable|integer',
+            'subcategory_id' => 'nullable|integer',
+            'method' => 'nullable|string|max:50',
+            'q' => 'nullable|string|max:255',
         ]);
 
-        $userId = Auth::id();
+        $today = Carbon::today();
+        $quick = $validated['quick'] ?? $validated['preset'] ?? null;
 
-        // Resultados (solo se cargan si el usuario seleccionó esa sección)
-        $data = [
-            'incomes' => collect(),
-            'expenses' => collect(),
-            'debts' => collect(),
-            'recurrings' => collect(),
-            'categories' => collect(),
+        [$from, $to] = match ($quick) {
+            'current_month' => [
+                $today->copy()->startOfMonth(),
+                $today->copy()->endOfMonth(),
+            ],
+            'previous_month' => [
+                $today->copy()->subMonthNoOverflow()->startOfMonth(),
+                $today->copy()->subMonthNoOverflow()->endOfMonth(),
+            ],
+            'last_3_months' => [
+                $today->copy()->subMonthsNoOverflow(2)->startOfMonth(),
+                $today->copy()->endOfMonth(),
+            ],
+            'current_year' => [
+                $today->copy()->startOfYear(),
+                $today->copy()->endOfYear(),
+            ],
+            default => [
+                Carbon::parse($validated['date_from'] ?? $validated['from'] ?? $today->copy()->startOfMonth()->toDateString()),
+                Carbon::parse($validated['date_to'] ?? $validated['to'] ?? $today->copy()->endOfMonth()->toDateString()),
+            ],
+        };
+
+        if ($to->lt($from)) {
+            throw ValidationException::withMessages([
+                'date_to' => 'La fecha hasta debe ser igual o posterior a la fecha desde.',
+            ]);
+        }
+
+        $movementType = $validated['movement_type'] ?? 'all';
+        $categoryId = isset($validated['category_id']) ? (int) $validated['category_id'] : null;
+        $subcategoryId = isset($validated['subcategory_id']) ? (int) $validated['subcategory_id'] : null;
+        $method = trim((string) ($validated['method'] ?? ''));
+        $text = trim((string) ($validated['q'] ?? ''));
+
+        $category = null;
+        if ($categoryId) {
+            $category = Category::where('user_id', $userId)->find($categoryId);
+
+            if (! $category) {
+                throw ValidationException::withMessages([
+                    'category_id' => 'La categoria seleccionada no es valida.',
+                ]);
+            }
+
+            if ($movementType !== 'all' && $category->type !== $movementType) {
+                throw ValidationException::withMessages([
+                    'category_id' => 'La categoria no coincide con el tipo de movimiento.',
+                ]);
+            }
+        }
+
+        if ($subcategoryId) {
+            $subcategory = Subcategory::with('category')
+                ->where('user_id', $userId)
+                ->find($subcategoryId);
+
+            if (! $subcategory) {
+                throw ValidationException::withMessages([
+                    'subcategory_id' => 'La subcategoria seleccionada no es valida.',
+                ]);
+            }
+
+            if ($categoryId && (int) $subcategory->category_id !== $categoryId) {
+                throw ValidationException::withMessages([
+                    'subcategory_id' => 'La subcategoria no pertenece a la categoria seleccionada.',
+                ]);
+            }
+
+            if ($movementType !== 'all' && $subcategory->category?->type !== $movementType) {
+                throw ValidationException::withMessages([
+                    'subcategory_id' => 'La subcategoria no coincide con el tipo de movimiento.',
+                ]);
+            }
+        }
+
+        return [
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+            'date_from' => $from->toDateString(),
+            'date_to' => $to->toDateString(),
+            'quick' => $quick,
+            'preset' => $quick,
+            'movement_type' => $movementType,
+            'category_id' => $categoryId,
+            'subcategory_id' => $subcategoryId,
+            'method' => $method,
+            'q' => $text,
+        ];
+    }
+
+    private function buildReport(array $filters, int $userId): array
+    {
+        $incomes = collect();
+        $expenses = collect();
+
+        if (in_array($filters['movement_type'], ['all', 'income'], true)) {
+            $incomes = $this->incomeQuery($filters, $userId)->get();
+        }
+
+        if (in_array($filters['movement_type'], ['all', 'expense'], true)) {
+            $expenses = $this->expenseQuery($filters, $userId)->get();
+        }
+
+        $incomeTotal = (float) $incomes->sum('amount');
+        $expenseTotal = (float) $expenses->sum('amount');
+        $incomeCount = $incomes->count();
+        $expenseCount = $expenses->count();
+
+        $summary = [
+            'income_total' => $incomeTotal,
+            'expense_total' => $expenseTotal,
+            'balance' => $incomeTotal - $expenseTotal,
+            'income_count' => $incomeCount,
+            'expense_count' => $expenseCount,
+            'income_average' => $incomeCount > 0 ? $incomeTotal / $incomeCount : 0,
+            'expense_average' => $expenseCount > 0 ? $expenseTotal / $expenseCount : 0,
+            'savings_rate' => $incomeTotal > 0 ? (($incomeTotal - $expenseTotal) / $incomeTotal) * 100 : null,
         ];
 
-        // Totales
-        $totals = [
-            'income' => 0,
-            'expense' => 0,
-            'balance' => 0,
+        $movements = $this->normalizeMovements($incomes, $expenses);
+
+        return [
+            'summary' => $summary,
+            'incomeCategorySummary' => $this->summarizeByCategory($incomes, $incomeTotal),
+            'expenseCategorySummary' => $this->summarizeByCategory($expenses, $expenseTotal),
+            'incomeSubcategorySummary' => $this->summarizeBySubcategory($incomes, $incomeTotal),
+            'expenseSubcategorySummary' => $this->summarizeBySubcategory($expenses, $expenseTotal),
+            'movements' => $movements,
         ];
+    }
 
-        // Charts (arrays listos para Chart.js)
-        $charts = [
-            'labels' => [],
-            'incomeByDay' => [],
-            'expenseByDay' => [],
-            'expenseByCategoryLabels' => [],
-            'expenseByCategoryValues' => [],
-            'incomeByCategoryLabels' => [],
-            'incomeByCategoryValues' => [],
-        ];
+    private function incomeQuery(array $filters, int $userId)
+    {
+        return Income::with(['category', 'subcategory'])
+            ->where('user_id', $userId)
+            ->whereBetween('date', [$filters['from'], $filters['to']])
+            ->when($filters['category_id'], fn ($query, $categoryId) => $query->where('category_id', $categoryId))
+            ->when($filters['subcategory_id'], fn ($query, $subcategoryId) => $query->where('subcategory_id', $subcategoryId))
+            ->when($filters['method'] !== '', fn ($query) => $query->where('method', $filters['method']))
+            ->when($filters['q'] !== '', fn ($query) => $query->where('description', 'like', '%' . $filters['q'] . '%'))
+            ->orderByDesc('date')
+            ->orderByDesc('id');
+    }
 
-        // INCOMES
-        if (in_array('incomes', $sections)) {
-            $data['incomes'] = Income::with('category')
-                ->where('user_id', $userId)
-                ->whereBetween('date', [$from, $to])
-                ->orderBy('date')
-                ->get();
+    private function expenseQuery(array $filters, int $userId)
+    {
+        return Expense::with(['category', 'subcategory'])
+            ->where('user_id', $userId)
+            ->whereBetween('date', [$filters['from'], $filters['to']])
+            ->when($filters['category_id'], fn ($query, $categoryId) => $query->where('category_id', $categoryId))
+            ->when($filters['subcategory_id'], fn ($query, $subcategoryId) => $query->where('subcategory_id', $subcategoryId))
+            ->when($filters['method'] !== '', fn ($query) => $query->where('method', $filters['method']))
+            ->when($filters['q'] !== '', fn ($query) => $query->where('description', 'like', '%' . $filters['q'] . '%'))
+            ->orderByDesc('date')
+            ->orderByDesc('id');
+    }
 
-            $totals['income'] = (float) $data['incomes']->sum('amount');
-        }
+    private function normalizeMovements($incomes, $expenses)
+    {
+        $incomeRows = $incomes->map(function ($income) {
+            return [
+                'id' => (int) $income->id,
+                'date' => Carbon::parse($income->date),
+                'type' => 'income',
+                'type_label' => 'Ingreso',
+                'category' => $income->category?->name ?? 'Sin categoria',
+                'subcategory' => $income->subcategory?->name ?? 'Sin subcategoria',
+                'description' => $income->description ?? '',
+                'method' => $income->method ?? '',
+                'amount' => (float) $income->amount,
+                'signed_amount' => (float) $income->amount,
+            ];
+        });
 
-        // EXPENSES
-        if (in_array('expenses', $sections)) {
-            $data['expenses'] = Expense::with('category')
-                ->where('user_id', $userId)
-                ->whereBetween('date', [$from, $to])
-                ->orderBy('date')
-                ->get();
+        $expenseRows = $expenses->map(function ($expense) {
+            return [
+                'id' => (int) $expense->id,
+                'date' => Carbon::parse($expense->date),
+                'type' => 'expense',
+                'type_label' => 'Egreso',
+                'category' => $expense->category?->name ?? 'Sin categoria',
+                'subcategory' => $expense->subcategory?->name ?? 'Sin subcategoria',
+                'description' => $expense->description ?? '',
+                'method' => $expense->method ?? '',
+                'amount' => (float) $expense->amount,
+                'signed_amount' => -1 * (float) $expense->amount,
+            ];
+        });
 
-            $totals['expense'] = (float) $data['expenses']->sum('amount');
-        }
+        return $incomeRows
+            ->concat($expenseRows)
+            ->sortByDesc(fn ($row) => $row['date']->format('Ymd') . str_pad((string) $row['id'], 10, '0', STR_PAD_LEFT))
+            ->values();
+    }
 
-        $totals['balance'] = $totals['income'] - $totals['expense'];
+    private function summarizeByCategory($items, float $total)
+    {
+        return $items
+            ->groupBy(fn ($item) => $item->category?->id ?? 'none')
+            ->map(function ($rows) use ($total) {
+                $amount = (float) $rows->sum('amount');
 
-        // DEBTS (cuotas) -> usamos next_due_date como “fecha”
-        if (in_array('debts', $sections)) {
-            $data['debts'] = Debt::with('category')
-                ->where('user_id', $userId)
-                ->whereBetween('next_due_date', [$from, $to])
-                ->orderBy('next_due_date')
-                ->get();
-        }
+                return [
+                    'category' => $rows->first()->category?->name ?? 'Sin categoria',
+                    'total' => $amount,
+                    'count' => $rows->count(),
+                    'percentage' => $total > 0 ? ($amount / $total) * 100 : 0,
+                ];
+            })
+            ->sortByDesc('total')
+            ->values();
+    }
 
-        // RECURRINGS -> usamos next_date como “fecha”
-        if (in_array('recurrings', $sections)) {
-            $data['recurrings'] = Recurring::with('category')
-                ->where('user_id', $userId)
-                ->whereBetween('next_date', [$from, $to])
-                ->orderBy('next_date')
-                ->get();
-        }
+    private function summarizeBySubcategory($items, float $total)
+    {
+        return $items
+            ->groupBy(function ($item) {
+                return ($item->category?->id ?? 'none') . '-' . ($item->subcategory?->id ?? 'none');
+            })
+            ->map(function ($rows) use ($total) {
+                $amount = (float) $rows->sum('amount');
 
-        // CATEGORIES (no depende fechas, pero lo mostramos si lo quiere)
-        if (in_array('categories', $sections)) {
-            $data['categories'] = Category::where('user_id', $userId)
-                ->orderBy('type')
-                ->orderBy('name')
-                ->get();
-        }
-
-        // ====== CHARTS ======
-        // Timeline por día (Ingresos vs Egresos)
-        // armamos labels por cada día entre from y to
-        $start = Carbon::parse($from);
-        $end = Carbon::parse($to);
-        $labels = [];
-        $cursor = $start->copy();
-
-        while ($cursor->lte($end)) {
-            $labels[] = $cursor->toDateString();
-            $cursor->addDay();
-        }
-
-        $charts['labels'] = $labels;
-
-        // Sumatorias por día
-        $incomeByDayMap = collect();
-        $expenseByDayMap = collect();
-
-        if (in_array('incomes', $sections)) {
-            $incomeByDayMap = $data['incomes']
-                ->groupBy('date')
-                ->map(fn($rows) => (float) $rows->sum('amount'));
-        }
-
-        if (in_array('expenses', $sections)) {
-            $expenseByDayMap = $data['expenses']
-                ->groupBy('date')
-                ->map(fn($rows) => (float) $rows->sum('amount'));
-        }
-
-        $charts['incomeByDay'] = array_map(fn($d) => $incomeByDayMap->get($d, 0), $labels);
-        $charts['expenseByDay'] = array_map(fn($d) => $expenseByDayMap->get($d, 0), $labels);
-
-        // Donuts por categoría (ingresos/egresos)
-        if (in_array('expenses', $sections)) {
-            $byCat = $data['expenses']->groupBy(fn($e) => $e->category?->name ?? 'Sin categoría')
-                ->map(fn($rows) => (float) $rows->sum('amount'))
-                ->sortDesc();
-
-            $charts['expenseByCategoryLabels'] = $byCat->keys()->values();
-            $charts['expenseByCategoryValues'] = $byCat->values()->values();
-        }
-
-        if (in_array('incomes', $sections)) {
-            $byCat = $data['incomes']->groupBy(fn($i) => $i->category?->name ?? 'Sin categoría')
-                ->map(fn($rows) => (float) $rows->sum('amount'))
-                ->sortDesc();
-
-            $charts['incomeByCategoryLabels'] = $byCat->keys()->values();
-            $charts['incomeByCategoryValues'] = $byCat->values()->values();
-        }
-
-        return view('reports.index', compact('from', 'to', 'sections', 'data', 'totals', 'charts'));
+                return [
+                    'category' => $rows->first()->category?->name ?? 'Sin categoria',
+                    'subcategory' => $rows->first()->subcategory?->name ?? 'Sin subcategoria',
+                    'total' => $amount,
+                    'count' => $rows->count(),
+                    'percentage' => $total > 0 ? ($amount / $total) * 100 : 0,
+                ];
+            })
+            ->sortByDesc('total')
+            ->values();
     }
 }

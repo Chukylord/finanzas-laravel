@@ -1,331 +1,261 @@
 <x-app-layout>
+    @php
+        $queryValue = fn ($value) => $value !== null && $value !== '';
+        $baseFilterQuery = array_filter([
+            'movement_type' => $filters['movement_type'] !== 'all' ? $filters['movement_type'] : null,
+            'category_id' => $filters['category_id'],
+            'subcategory_id' => $filters['subcategory_id'],
+            'method' => $filters['method'],
+            'q' => $filters['q'],
+        ], $queryValue);
+        $exportQuery = array_merge($baseFilterQuery, [
+            'date_from' => $filters['date_from'],
+            'date_to' => $filters['date_to'],
+        ]);
+    @endphp
+
     <x-slot name="header">
-        <span class="text-lg">Informes</span>
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+                <span class="text-lg font-semibold">Reportes</span>
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ \Carbon\Carbon::parse($filters['from'])->format('d/m/Y') }} al {{ \Carbon\Carbon::parse($filters['to'])->format('d/m/Y') }}
+                </div>
+            </div>
+
+            <a href="{{ route('reports.export', $exportQuery) }}"
+               class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-emerald-700 text-white hover:bg-emerald-800 text-sm font-semibold">
+                Exportar CSV
+            </a>
+        </div>
     </x-slot>
 
-    <div class="space-y-6">
+    @php
+        $money = fn ($value) => ((float) $value < 0 ? '-$' : '$') . number_format(abs((float) $value), 2, ',', '.');
+        $signedMoney = fn ($value) => ((float) $value > 0 ? '+' : ((float) $value < 0 ? '-' : '')) . '$' . number_format(abs((float) $value), 2, ',', '.');
+        $percent = fn ($value) => $value === null ? 'Sin ingresos' : number_format((float) $value, 1, ',', '.') . '%';
+    @endphp
 
-        {{-- Filtros --}}
+    <div class="space-y-6">
+        @if (isset($errors) && $errors->any())
+            <div class="px-4 py-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-100 dark:bg-rose-900/30 dark:text-rose-200 dark:border-rose-900">
+                <ul class="list-disc pl-5 text-sm space-y-1">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
         <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm p-5">
             <form method="GET" action="{{ route('reports.index') }}" class="space-y-4">
+                <div class="flex flex-wrap gap-2">
+                    @foreach($quickFilters as $key => $label)
+                        <a href="{{ route('reports.index', array_merge($baseFilterQuery, ['quick' => $key])) }}"
+                           class="px-3 py-2 rounded-xl border text-sm {{ $filters['quick'] === $key ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800' }}">
+                            {{ $label }}
+                        </a>
+                    @endforeach
+                    <a href="{{ route('reports.index', ['quick' => 'current_month']) }}"
+                       class="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm">
+                        Limpiar
+                    </a>
+                </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                     <div>
                         <label class="block text-sm mb-1 text-gray-600 dark:text-gray-300">Desde</label>
-                        <input type="date" name="from" value="{{ $from }}"
+                        <input type="date" name="date_from" value="{{ $filters['date_from'] }}"
                                class="w-full rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900">
                     </div>
 
                     <div>
                         <label class="block text-sm mb-1 text-gray-600 dark:text-gray-300">Hasta</label>
-                        <input type="date" name="to" value="{{ $to }}"
+                        <input type="date" name="date_to" value="{{ $filters['date_to'] }}"
                                class="w-full rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900">
                     </div>
 
-                    <div class="flex items-end gap-2">
-                        <button class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-black">
-                            Ver informe
-                        </button>
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-600 dark:text-gray-300">Tipo</label>
+                        <select name="movement_type" class="w-full rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                            <option value="all" {{ $filters['movement_type'] === 'all' ? 'selected' : '' }}>Todos</option>
+                            <option value="income" {{ $filters['movement_type'] === 'income' ? 'selected' : '' }}>Solo ingresos</option>
+                            <option value="expense" {{ $filters['movement_type'] === 'expense' ? 'selected' : '' }}>Solo egresos</option>
+                        </select>
+                    </div>
 
-                        <a href="{{ route('reports.index') }}"
-                           class="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">
-                            Reset
-                        </a>
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-600 dark:text-gray-300">Método</label>
+                        <select name="method" class="w-full rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                            <option value="">Todos</option>
+                            @foreach($methods as $method)
+                                <option value="{{ $method }}" {{ $filters['method'] === $method ? 'selected' : '' }}>
+                                    {{ $method }}
+                                </option>
+                            @endforeach
+                        </select>
                     </div>
                 </div>
 
-                <div class="flex flex-wrap gap-3">
-                    @php
-                        $opts = [
-                            'incomes' => 'Ingresos',
-                            'expenses' => 'Egresos',
-                            'debts' => 'Cuotas / Deudas',
-                            'recurrings' => 'Recurrentes',
-                            'categories' => 'Categorías',
-                        ];
-                    @endphp
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-600 dark:text-gray-300">Categoría</label>
+                        <select name="category_id" class="w-full rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                            <option value="">Todas</option>
+                            @foreach($categories as $category)
+                                <option value="{{ $category->id }}" {{ (int) $filters['category_id'] === (int) $category->id ? 'selected' : '' }}>
+                                    {{ $category->type === 'income' ? 'Ingreso' : 'Egreso' }} / {{ $category->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
 
-                    @foreach($opts as $key => $label)
-                        <label class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-                            <input type="checkbox" name="sections[]" value="{{ $key }}"
-                                   class="rounded"
-                                   {{ in_array($key, $sections ?? []) ? 'checked' : '' }}>
-                            <span class="text-sm">{{ $label }}</span>
-                        </label>
-                    @endforeach
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-600 dark:text-gray-300">Subcategoría</label>
+                        <select name="subcategory_id" class="w-full rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                            <option value="">Todas</option>
+                            @foreach($subcategories as $subcategory)
+                                <option value="{{ $subcategory->id }}" {{ (int) $filters['subcategory_id'] === (int) $subcategory->id ? 'selected' : '' }}>
+                                    {{ $subcategory->category?->name ?? 'Sin categoría' }} / {{ $subcategory->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="xl:col-span-2">
+                        <label class="block text-sm mb-1 text-gray-600 dark:text-gray-300">Texto en descripción</label>
+                        <div class="flex gap-2">
+                            <input type="text" name="q" value="{{ $filters['q'] }}"
+                                   placeholder="Buscar por descripción"
+                                   class="w-full rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                            <button class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-black whitespace-nowrap">
+                                Aplicar
+                            </button>
+                        </div>
+                    </div>
                 </div>
-
             </form>
         </div>
 
-        {{-- Cards --}}
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm p-5">
-                <div class="text-sm text-gray-500 dark:text-gray-400">Ingresos</div>
-                <div class="mt-1 text-2xl font-semibold">${{ number_format($totals['income'], 2, ',', '.') }}</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">Ingresos filtrados</div>
+                <div class="mt-1 text-2xl font-semibold text-emerald-700 dark:text-emerald-200">{{ $money($summary['income_total']) }}</div>
+                <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ $summary['income_count'] }} movimiento(s)</div>
             </div>
 
             <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm p-5">
-                <div class="text-sm text-gray-500 dark:text-gray-400">Egresos</div>
-                <div class="mt-1 text-2xl font-semibold">${{ number_format($totals['expense'], 2, ',', '.') }}</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">Egresos filtrados</div>
+                <div class="mt-1 text-2xl font-semibold text-rose-700 dark:text-rose-200">{{ $money($summary['expense_total']) }}</div>
+                <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ $summary['expense_count'] }} movimiento(s)</div>
             </div>
 
             <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm p-5">
-                <div class="text-sm text-gray-500 dark:text-gray-400">Balance</div>
-                <div class="mt-1 text-2xl font-semibold">${{ number_format($totals['balance'], 2, ',', '.') }}</div>
-                <div class="text-xs mt-2 {{ $totals['balance'] >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
-                    {{ $totals['balance'] >= 0 ? 'Positivo' : 'Negativo' }}
+                <div class="text-sm text-gray-500 dark:text-gray-400">Balance / ahorro</div>
+                <div class="mt-1 text-2xl font-semibold {{ $summary['balance'] >= 0 ? 'text-emerald-700 dark:text-emerald-200' : 'text-rose-700 dark:text-rose-200' }}">
+                    {{ $money($summary['balance']) }}
                 </div>
+                <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">Ingresos - egresos</div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm p-5">
+                <div class="text-sm text-gray-500 dark:text-gray-400">Tasa de ahorro</div>
+                <div class="mt-1 text-2xl font-semibold {{ $summary['savings_rate'] !== null && $summary['savings_rate'] >= 0 ? 'text-emerald-700 dark:text-emerald-200' : 'text-rose-700 dark:text-rose-200' }}">
+                    {{ $percent($summary['savings_rate']) }}
+                </div>
+                <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">Sobre ingresos filtrados</div>
             </div>
         </div>
 
-        {{-- Gráficos --}}
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div class="xl:col-span-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm p-5">
-                <div class="flex items-center justify-between mb-3">
-                    <h2 class="font-semibold">Ingresos vs Egresos (por día)</h2>
-                    <span class="text-xs text-gray-500">{{ $from }} → {{ $to }}</span>
-                </div>
-                <canvas id="chartLine" height="110"></canvas>
-            </div>
-
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm p-5">
-                <h2 class="font-semibold mb-3">Egresos por categoría</h2>
-                <canvas id="chartExpenseDonut" height="180"></canvas>
+                <div class="text-sm text-gray-500 dark:text-gray-400">Promedio de ingreso</div>
+                <div class="mt-1 text-xl font-semibold">{{ $money($summary['income_average']) }}</div>
             </div>
-
             <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm p-5">
-                <h2 class="font-semibold mb-3">Ingresos por categoría</h2>
-                <canvas id="chartIncomeDonut" height="180"></canvas>
+                <div class="text-sm text-gray-500 dark:text-gray-400">Promedio de egreso</div>
+                <div class="mt-1 text-xl font-semibold">{{ $money($summary['expense_average']) }}</div>
             </div>
         </div>
 
-        {{-- Secciones --}}
-        @if(in_array('incomes', $sections))
-            <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
-                    <h2 class="font-semibold">Ingresos</h2>
-                    <span class="text-sm text-gray-500">{{ $data['incomes']->count() }} items</span>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead class="bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300">
-                            <tr>
-                                <th class="text-left font-medium px-6 py-3">Fecha</th>
-                                <th class="text-left font-medium px-6 py-3">Categoría</th>
-                                <th class="text-left font-medium px-6 py-3">Descripción</th>
-                                <th class="text-right font-medium px-6 py-3">Monto</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                            @forelse($data['incomes'] as $i)
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                                    <td class="px-6 py-3">{{ \Carbon\Carbon::parse($i->date)->format('d/m/Y') }}</td>
-                                    <td class="px-6 py-3">{{ $i->category?->name }}</td>
-                                    <td class="px-6 py-3">{{ $i->description }}</td>
-                                    <td class="px-6 py-3 text-right font-semibold">${{ number_format($i->amount, 2, ',', '.') }}</td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="4" class="px-6 py-6 text-center text-gray-500">Sin ingresos en el rango.</td></tr>
-                            @endforelse
-                            <tr class="bg-gray-50 dark:bg-gray-800/30">
-                                <td colspan="3" class="px-6 py-3 font-semibold">TOTAL</td>
-                                <td class="px-6 py-3 text-right font-bold">${{ number_format($data['incomes']->sum('amount'), 2, ',', '.') }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <x-report-summary-table
+                title="Ingresos por categoría"
+                :rows="$incomeCategorySummary"
+                empty="Sin ingresos para los filtros aplicados."
+                :money="$money"
+            />
+
+            <x-report-summary-table
+                title="Egresos por categoría"
+                :rows="$expenseCategorySummary"
+                empty="Sin egresos para los filtros aplicados."
+                :money="$money"
+            />
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <x-report-subcategory-table
+                title="Ingresos por subcategoría"
+                :rows="$incomeSubcategorySummary"
+                empty="Sin ingresos con subcategorías para los filtros aplicados."
+                :money="$money"
+            />
+
+            <x-report-subcategory-table
+                title="Egresos por subcategoría"
+                :rows="$expenseSubcategorySummary"
+                empty="Sin egresos con subcategorías para los filtros aplicados."
+                :money="$money"
+            />
+        </div>
+
+        <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden">
+            <div class="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <h2 class="font-semibold">Detalle de movimientos</h2>
+                <span class="text-sm text-gray-500 dark:text-gray-400">{{ $movements->count() }} movimiento(s)</span>
             </div>
-        @endif
 
-        @if(in_array('expenses', $sections))
-            <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
-                    <h2 class="font-semibold">Egresos</h2>
-                    <span class="text-sm text-gray-500">{{ $data['expenses']->count() }} items</span>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead class="bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300">
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300">
+                        <tr>
+                            <th class="text-left font-medium px-4 sm:px-6 py-3">Fecha</th>
+                            <th class="text-left font-medium px-4 sm:px-6 py-3">Tipo</th>
+                            <th class="text-left font-medium px-4 sm:px-6 py-3">Categoría</th>
+                            <th class="text-left font-medium px-4 sm:px-6 py-3">Subcategoría</th>
+                            <th class="text-left font-medium px-4 sm:px-6 py-3">Descripción</th>
+                            <th class="text-left font-medium px-4 sm:px-6 py-3">Método</th>
+                            <th class="text-right font-medium px-4 sm:px-6 py-3">Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                        @forelse($movements as $movement)
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40">
+                                <td class="px-4 sm:px-6 py-3 whitespace-nowrap">{{ $movement['date']->format('d/m/Y') }}</td>
+                                <td class="px-4 sm:px-6 py-3">
+                                    <span class="inline-flex px-2 py-1 rounded-full text-xs font-semibold {{ $movement['type'] === 'income' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200' : 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200' }}">
+                                        {{ $movement['type_label'] }}
+                                    </span>
+                                </td>
+                                <td class="px-4 sm:px-6 py-3">{{ $movement['category'] }}</td>
+                                <td class="px-4 sm:px-6 py-3">{{ $movement['subcategory'] }}</td>
+                                <td class="px-4 sm:px-6 py-3">{{ $movement['description'] ?: '-' }}</td>
+                                <td class="px-4 sm:px-6 py-3">{{ $movement['method'] ?: '-' }}</td>
+                                <td class="px-4 sm:px-6 py-3 text-right font-semibold {{ $movement['signed_amount'] >= 0 ? 'text-emerald-700 dark:text-emerald-200' : 'text-rose-700 dark:text-rose-200' }}">
+                                    {{ $signedMoney($movement['signed_amount']) }}
+                                </td>
+                            </tr>
+                        @empty
                             <tr>
-                                <th class="text-left font-medium px-6 py-3">Fecha</th>
-                                <th class="text-left font-medium px-6 py-3">Categoría</th>
-                                <th class="text-left font-medium px-6 py-3">Descripción</th>
-                                <th class="text-right font-medium px-6 py-3">Monto</th>
+                                <td colspan="7" class="px-4 sm:px-6 py-6 text-center text-gray-500 dark:text-gray-400">
+                                    No hay movimientos para los filtros aplicados.
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                            @forelse($data['expenses'] as $e)
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                                    <td class="px-6 py-3">{{ \Carbon\Carbon::parse($e->date)->format('d/m/Y') }}</td>
-                                    <td class="px-6 py-3">{{ $e->category?->name }}</td>
-                                    <td class="px-6 py-3">{{ $e->description }}</td>
-                                    <td class="px-6 py-3 text-right font-semibold">${{ number_format($e->amount, 2, ',', '.') }}</td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="4" class="px-6 py-6 text-center text-gray-500">Sin egresos en el rango.</td></tr>
-                            @endforelse
-                            <tr class="bg-gray-50 dark:bg-gray-800/30">
-                                <td colspan="3" class="px-6 py-3 font-semibold">TOTAL</td>
-                                <td class="px-6 py-3 text-right font-bold">${{ number_format($data['expenses']->sum('amount'), 2, ',', '.') }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
-        @endif
-
-        @if(in_array('debts', $sections))
-            <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
-                    <h2 class="font-semibold">Cuotas / Deudas (por vencimiento)</h2>
-                    <span class="text-sm text-gray-500">{{ $data['debts']->count() }} items</span>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead class="bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300">
-                            <tr>
-                                <th class="text-left font-medium px-6 py-3">Vence</th>
-                                <th class="text-left font-medium px-6 py-3">Nombre</th>
-                                <th class="text-left font-medium px-6 py-3">Pagadas</th>
-                                <th class="text-right font-medium px-6 py-3">Cuota</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                            @forelse($data['debts'] as $d)
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                                    <td class="px-6 py-3">{{ \Carbon\Carbon::parse($d->next_due_date)->format('d/m/Y') }}</td>
-                                    <td class="px-6 py-3">
-                                        <div class="font-medium">{{ $d->name }}</div>
-                                        <div class="text-xs text-gray-500">{{ $d->category?->name }}</div>
-                                    </td>
-                                    <td class="px-6 py-3">{{ $d->installments_paid }}/{{ $d->installments_total }}</td>
-                                    <td class="px-6 py-3 text-right font-semibold">${{ number_format($d->installment_amount, 2, ',', '.') }}</td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="4" class="px-6 py-6 text-center text-gray-500">Sin cuotas en el rango.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        @endif
-
-        @if(in_array('recurrings', $sections))
-            <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
-                    <h2 class="font-semibold">Recurrentes (próxima fecha)</h2>
-                    <span class="text-sm text-gray-500">{{ $data['recurrings']->count() }} items</span>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead class="bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300">
-                            <tr>
-                                <th class="text-left font-medium px-6 py-3">Próx.</th>
-                                <th class="text-left font-medium px-6 py-3">Nombre</th>
-                                <th class="text-left font-medium px-6 py-3">Categoría</th>
-                                <th class="text-right font-medium px-6 py-3">Monto</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                            @forelse($data['recurrings'] as $r)
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                                    <td class="px-6 py-3">{{ \Carbon\Carbon::parse($r->next_date)->format('d/m/Y') }}</td>
-                                    <td class="px-6 py-3">
-                                        <div class="font-medium">{{ $r->name }}</div>
-                                        <div class="text-xs text-gray-500">{{ $r->active ? 'Activo' : 'Inactivo' }} · {{ $r->period }}</div>
-                                    </td>
-                                    <td class="px-6 py-3">{{ $r->category?->name }}</td>
-                                    <td class="px-6 py-3 text-right font-semibold">${{ number_format($r->amount, 2, ',', '.') }}</td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="4" class="px-6 py-6 text-center text-gray-500">Sin recurrentes en el rango.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        @endif
-
-        @if(in_array('categories', $sections))
-            <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
-                    <h2 class="font-semibold">Categorías</h2>
-                    <span class="text-sm text-gray-500">{{ $data['categories']->count() }} items</span>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead class="bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-300">
-                            <tr>
-                                <th class="text-left font-medium px-6 py-3">Tipo</th>
-                                <th class="text-left font-medium px-6 py-3">Nombre</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                            @forelse($data['categories'] as $c)
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                                    <td class="px-6 py-3">{{ $c->type == 'income' ? 'Ingreso' : 'Egreso' }}</td>
-                                    <td class="px-6 py-3 font-medium">{{ $c->name }}</td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="2" class="px-6 py-6 text-center text-gray-500">Sin categorías.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        @endif
-
+        </div>
     </div>
-
-    {{-- Chart.js --}}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        const labels = @json($charts['labels']);
-        const incomeByDay = @json($charts['incomeByDay']);
-        const expenseByDay = @json($charts['expenseByDay']);
-
-        const expCatLabels = @json($charts['expenseByCategoryLabels']);
-        const expCatValues = @json($charts['expenseByCategoryValues']);
-
-        const incCatLabels = @json($charts['incomeByCategoryLabels']);
-        const incCatValues = @json($charts['incomeByCategoryValues']);
-
-        // Line chart: ingresos vs egresos
-        new Chart(document.getElementById('chartLine'), {
-            type: 'line',
-            data: {
-                labels,
-                datasets: [
-                    { label: 'Ingresos', data: incomeByDay, tension: 0.25 },
-                    { label: 'Egresos', data: expenseByDay, tension: 0.25 },
-                ]
-            },
-            options: {
-                responsive: true,
-                interaction: { mode: 'index', intersect: false },
-                plugins: { legend: { display: true } },
-                scales: {
-                    x: { ticks: { maxTicksLimit: 8 } }
-                }
-            }
-        });
-
-        // Donut egresos
-        new Chart(document.getElementById('chartExpenseDonut'), {
-            type: 'doughnut',
-            data: { labels: expCatLabels, datasets: [{ data: expCatValues }] },
-            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-        });
-
-        // Donut ingresos
-        new Chart(document.getElementById('chartIncomeDonut'), {
-            type: 'doughnut',
-            data: { labels: incCatLabels, datasets: [{ data: incCatValues }] },
-            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-        });
-    </script>
 </x-app-layout>
