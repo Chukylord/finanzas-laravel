@@ -15,6 +15,7 @@ use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SubcategoryController;
 use App\Http\Controllers\InvestmentReportController;
+use App\Http\Controllers\BackupController;
 
 
 Route::get('/', function () {
@@ -33,7 +34,20 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::resource('categories', CategoryController::class)->except(['show']);
+
+    Route::get('/backups', [BackupController::class, 'index'])->name('backups.index');
+    Route::post('/backups', [BackupController::class, 'store'])->name('backups.store');
+    Route::get('/backups/{filename}/download', [BackupController::class, 'download'])
+        ->where('filename', 'backup_finanzas_[0-9_]+\.sql')
+        ->name('backups.download');
+    Route::delete('/backups/{filename}', [BackupController::class, 'destroy'])
+        ->where('filename', 'backup_finanzas_[0-9_]+\.sql')
+        ->name('backups.destroy');
+
+    Route::post('/incomes/bulk-update', [IncomeController::class, 'bulkUpdate'])->name('incomes.bulk-update');
     Route::resource('incomes', IncomeController::class)->except(['show']);
+
+    Route::post('/expenses/bulk-update', [ExpenseController::class, 'bulkUpdate'])->name('expenses.bulk-update');
     Route::resource('expenses', ExpenseController::class)->except(['show']);
 
     Route::post('/recurrings/{recurring}/generate-expense', [RecurringController::class, 'generateExpense'])

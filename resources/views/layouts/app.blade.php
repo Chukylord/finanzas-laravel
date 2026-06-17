@@ -69,6 +69,10 @@
                 <span>📈</span> <span>Informes inversión</span>
             </a>
             
+            <a class="{{ $link }} {{ request()->routeIs('backups.*') ? $active : '' }}" href="{{ route('backups.index') }}">
+                <span>BK</span> <span>Backups</span>
+            </a>
+
         </nav>
 
         <div class="mt-auto p-4 border-t border-gray-200 dark:border-gray-800">

@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Subcategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class ExpenseController extends Controller
@@ -194,6 +195,104 @@ class ExpenseController extends Controller
             ->with('ok', 'Egreso actualizado');
     }
 
+    public function bulkUpdate(Request $request)
+    {
+        $request->validate([
+            'selected_ids' => 'required|array|min:1',
+            'selected_ids.*' => 'integer',
+            'bulk_category_id' => 'nullable|integer',
+            'bulk_subcategory_id' => 'nullable|integer',
+            'clear_subcategory' => 'nullable|boolean',
+        ]);
+
+        $userId = Auth::id();
+        $ids = collect($request->input('selected_ids', []))
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $categoryId = $request->filled('bulk_category_id') ? (int) $request->bulk_category_id : null;
+        $clearSubcategory = $request->boolean('clear_subcategory');
+        $subcategoryId = (! $clearSubcategory && $request->filled('bulk_subcategory_id'))
+            ? (int) $request->bulk_subcategory_id
+            : null;
+
+        if (! $categoryId && ! $subcategoryId && ! $clearSubcategory) {
+            return back()
+                ->withErrors(['bulk_action' => 'Elegí una categoría, una subcategoría o limpiar subcategoría.'])
+                ->withInput();
+        }
+
+        if ($subcategoryId && ! $categoryId) {
+            return back()
+                ->withErrors(['bulk_subcategory_id' => 'Para asignar una subcategoría, elegí también su categoría.'])
+                ->withInput();
+        }
+
+        if ($categoryId) {
+            $category = Category::where('user_id', $userId)
+                ->where('type', 'expense')
+                ->find($categoryId);
+
+            if (! $category) {
+                return back()
+                    ->withErrors(['bulk_category_id' => 'La categoría seleccionada no es válida para egresos.'])
+                    ->withInput();
+            }
+        }
+
+        if ($subcategoryId) {
+            $subcategory = Subcategory::where('user_id', $userId)
+                ->where('category_id', $categoryId)
+                ->find($subcategoryId);
+
+            if (! $subcategory) {
+                return back()
+                    ->withErrors(['bulk_subcategory_id' => 'La subcategoría no pertenece a la categoría seleccionada.'])
+                    ->withInput();
+            }
+        }
+
+        $expenses = Expense::where('user_id', $userId)
+            ->whereIn('id', $ids)
+            ->get();
+
+        if ($expenses->count() !== $ids->count()) {
+            return back()
+                ->withErrors(['selected_ids' => 'Algunos egresos seleccionados no existen o no pertenecen a tu usuario.'])
+                ->withInput();
+        }
+
+        $validSubcategoryIds = $categoryId
+            ? Subcategory::where('user_id', $userId)->where('category_id', $categoryId)->pluck('id')
+            : collect();
+
+        DB::transaction(function () use ($expenses, $categoryId, $clearSubcategory, $subcategoryId, $validSubcategoryIds): void {
+            foreach ($expenses as $expense) {
+                if ($categoryId) {
+                    $expense->category_id = $categoryId;
+                }
+
+                if ($clearSubcategory) {
+                    $expense->subcategory_id = null;
+                } elseif ($subcategoryId) {
+                    $expense->subcategory_id = $subcategoryId;
+                } elseif ($categoryId && $expense->subcategory_id && ! $validSubcategoryIds->contains((int) $expense->subcategory_id)) {
+                    $expense->subcategory_id = null;
+                }
+
+                if ($expense->isDirty()) {
+                    $expense->save();
+                }
+            }
+        });
+
+        return redirect()
+            ->route('expenses.index', $this->filterRedirectQuery($request))
+            ->with('ok', 'Se actualizaron ' . $expenses->count() . ' egresos');
+    }
+
     public function destroy(Expense $expense)
     {
         if ($expense->user_id != Auth::id()) abort(403);
@@ -203,5 +302,13 @@ class ExpenseController extends Controller
 
         return redirect()->route('expenses.index', ['month' => $d->month, 'year' => $d->year])
             ->with('ok', 'Egreso eliminado');
+    }
+
+    private function filterRedirectQuery(Request $request): array
+    {
+        return array_filter(
+            array_intersect_key($request->query(), array_flip(['month', 'year', 'category_id', 'subcategory_id'])),
+            fn ($value) => $value !== null && $value !== ''
+        );
     }
 }
