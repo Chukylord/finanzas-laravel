@@ -35,10 +35,4 @@ return [
         ],
     ],
 
-    'iol' => [
-        'base_url' => env('IOL_BASE_URL', 'https://api.invertironline.com'),
-        'username' => env('IOL_USERNAME'),
-        'password' => env('IOL_PASSWORD'),
-    ],
-
 ];

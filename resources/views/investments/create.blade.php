@@ -3,7 +3,7 @@
         <div class="flex items-center justify-between mb-6">
             <div>
                 <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Nueva cuenta de inversión</h1>
-                <p class="text-sm text-gray-600 dark:text-gray-400">Ej: Ahorros fijos / IOL / Cripto.</p>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Ej: Ahorros fijos / Broker / Cripto.</p>
             </div>
             <a href="{{ route('investments.index') }}" class="text-sm font-medium hover:underline">Volver</a>
         </div>
@@ -15,7 +15,7 @@
                 <x-form.input
                     label="Nombre"
                     name="name"
-                    placeholder="Ej: Ahorros fijos / Inversiones IOL"
+                    placeholder="Ej: Ahorros fijos / Inversiones broker"
                     required
                 />
 

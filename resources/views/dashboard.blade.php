@@ -17,10 +17,6 @@
                     Deudas
                 </a>
 
-                <a href="{{ route('markets.index') }}" class="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm hover:bg-gray-50 dark:hover:bg-gray-800">
-                    Mercados
-                </a>
-
                 <a href="{{ route('investments.index') }}" class="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm hover:bg-gray-50 dark:hover:bg-gray-800">
                     Inversiones
                 </a>

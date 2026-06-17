@@ -9,14 +9,12 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\RecurringController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DebtController;
-use App\Http\Controllers\MarketController;
-use App\Http\Controllers\InstrumentController;
-use App\Http\Controllers\WatchlistController;
-use App\Http\Controllers\SignalRuleController;
 use App\Http\Controllers\InvestmentAccountController;
 use App\Http\Controllers\InvestmentMovementController;
 use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SubcategoryController;
+use App\Http\Controllers\InvestmentReportController;
 
 
 Route::get('/', function () {
@@ -45,17 +43,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/debts/{debt}/pay', [DebtController::class, 'payInstallment'])->name('debts.pay');
     Route::resource('debts', DebtController::class)->except(['show']);
 
-    Route::get('/markets', [MarketController::class, 'index'])->name('markets.index');
-
-    Route::resource('instruments', InstrumentController::class)->except(['show']);
-    Route::post('/watchlist/{instrument}/toggle', [WatchlistController::class, 'toggle'])->name('watchlist.toggle');
-    Route::patch('/watchlist/{watchlistItem}/horizon', [WatchlistController::class, 'updateHorizon'])->name('watchlist.horizon');
-    Route::post('/watchlist/bulk', [\App\Http\Controllers\WatchlistController::class, 'bulk'])
-        ->name('watchlist.bulk');
-
-    Route::resource('signal-rules', SignalRuleController::class)->except(['show']);
-
     Route::resource('investments', InvestmentAccountController::class)->except(['show']);
+
+    Route::resource('subcategories', SubcategoryController::class)->except(['show']);
 
     Route::get('investments/{investment}/movements', [InvestmentMovementController::class, 'index'])
         ->name('investments.movements.index');
@@ -74,6 +64,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::delete('movements/{movement}', [InvestmentMovementController::class, 'destroy'])
         ->name('movements.destroy');
+
+    Route::get('/investment-reports', [InvestmentReportController::class, 'index'])
+        ->name('investment-reports.index');
 
     Route::get('/exchange-rates', [ExchangeRateController::class, 'index'])->name('exchange-rates.index');
     Route::post('/exchange-rates', [ExchangeRateController::class, 'store'])->name('exchange-rates.store');

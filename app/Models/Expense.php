@@ -8,7 +8,7 @@ use App\Models\Category;
 
 class Expense extends Model
 {
-    protected $fillable = ['user_id', 'category_id', 'date', 'amount', 'description', 'method'];
+    protected $fillable = ['user_id', 'category_id', 'subcategory_id', 'date', 'amount', 'description', 'method'];
 
     public function user()
     {
@@ -18,5 +18,10 @@ class Expense extends Model
     public function category()
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function subcategory()
+    {
+        return $this->belongsTo(Subcategory::class);
     }
 }

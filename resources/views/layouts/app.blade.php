@@ -52,8 +52,9 @@
             <a class="{{ $link }} {{ request()->routeIs('categories.*') ? $active : '' }}" href="{{ route('categories.index') }}">
                 <span>🏷️</span> <span>Categorías</span>
             </a>
-            <a class="{{ $link }} {{ request()->routeIs('markets.*') ? $active : '' }}" href="{{ route('markets.index') }}">
-                <span>🌐</span> <span>Mercados</span>
+
+            <a class="{{ $link }} {{ request()->routeIs('subcategories.*') ? $active : '' }}" href="{{ route('subcategories.index') }}">
+                <span>🏷️</span> <span>Subcategorías</span>
             </a>
 
             <a class="{{ $link }} {{ request()->routeIs('investments.*') ? $active : '' }}" href="{{ route('investments.index') }}">
@@ -62,6 +63,10 @@
 
             <a class="{{ $link }} {{ request()->routeIs('reports.*') ? $active : '' }}" href="{{ route('reports.index') }}">
                 <span>📈</span> <span>Informes</span>
+            </a>
+
+            <a class="{{ $link }} {{ request()->routeIs('reports.*') ? $active : '' }}" href="{{ route('investment-reports.index') }}">
+                <span>📈</span> <span>Informes inversión</span>
             </a>
             
         </nav>

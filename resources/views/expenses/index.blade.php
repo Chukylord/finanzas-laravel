@@ -55,6 +55,20 @@
                     </select>
                 </div>
 
+                <div class="min-w-[240px]">
+                    <label class="block text-sm mb-1 text-gray-600 dark:text-gray-300">Subcategoría</label>
+                    <select name="subcategory_id" class="w-full rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                        <option value="">Todas</option>
+                        @foreach($subcategories as $sub)
+                            <option value="{{ $sub->id }}"
+                                    data-category="{{ $sub->category_id }}"
+                                    {{ (string)$subcategoryId === (string)$sub->id ? 'selected' : '' }}>
+                                {{ $sub->category?->name }} · {{ $sub->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
                 <button class="px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-black">
                     Filtrar
                 </button>
@@ -86,6 +100,7 @@
                         <tr>
                             <th class="text-left font-medium px-4 sm:px-6 py-3">Fecha</th>
                             <th class="text-left font-medium px-4 sm:px-6 py-3">Categoría</th>
+                            <th class="text-left font-medium px-4 sm:px-6 py-3">Subcategoría</th>
                             <th class="text-left font-medium px-4 sm:px-6 py-3">Detalle</th>
                             <th class="text-right font-medium px-4 sm:px-6 py-3">Monto</th>
                             <th class="text-right font-medium px-4 sm:px-6 py-3">Acciones</th>
@@ -101,6 +116,10 @@
 
                                 <td class="px-4 sm:px-6 py-3">
                                     {{ $expense->category?->name ?? '—' }}
+                                </td>
+
+                                <td class="px-4 sm:px-6 py-3">
+                                    {{ $expense->subcategory?->name ?? '—' }}
                                 </td>
 
                                 <td class="px-4 sm:px-6 py-3">
@@ -131,7 +150,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="px-4 sm:px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                                <td colspan="6" class="px-4 sm:px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                                     No hay egresos para los filtros seleccionados.
                                 </td>
                             </tr>
@@ -142,4 +161,32 @@
         </div>
 
     </div>
+
+    <script>
+        const catFilter = document.querySelector('[name="category_id"]');
+        const subFilter = document.querySelector('[name="subcategory_id"]');
+
+        function filterSubcategoryFilter() {
+            if (!catFilter || !subFilter) return;
+
+            const catId = catFilter.value;
+
+            Array.from(subFilter.options).forEach(option => {
+                if (option.value === '') {
+                    option.hidden = false;
+                    return;
+                }
+
+                option.hidden = catId !== '' && option.dataset.category !== catId;
+            });
+
+            const selected = subFilter.options[subFilter.selectedIndex];
+            if (selected && selected.hidden) {
+                subFilter.value = '';
+            }
+        }
+
+        catFilter?.addEventListener('change', filterSubcategoryFilter);
+        filterSubcategoryFilter();
+    </script>
 </x-app-layout>

@@ -13,7 +13,7 @@
 
         <div class="flex items-start justify-between gap-3 flex-wrap">
             <div class="text-sm text-gray-500 dark:text-gray-400">
-                Registrá tus cuentas (Ahorros, IOL, Cripto) y sus movimientos.
+                Registrá tus cuentas (Ahorros, Broker, Cripto) y sus movimientos.
                 <div class="mt-1">
                     @if($usdArs)
                         <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200">
