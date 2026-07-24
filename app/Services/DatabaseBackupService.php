@@ -35,21 +35,27 @@ class DatabaseBackupService
         $filename = 'backup_finanzas_' . now()->format('Y_m_d_His') . '.sql';
         $path = $this->backupDirectory() . DIRECTORY_SEPARATOR . $filename;
         $mysqldump = $this->resolveMysqldumpPath();
-        $defaultsFile = $this->createDefaultsFile($connection);
+        $host = $this->normalizeHost((string) ($connection['host'] ?? '127.0.0.1'));
+        $port = $this->normalizePort($connection['port'] ?? '3306');
+        $charset = (string) ($connection['charset'] ?? 'utf8mb4');
+        $defaultsFile = $this->createDefaultsFile($connection, $host, $port);
         $password = (string) ($connection['password'] ?? '');
 
         try {
             $process = new Process([
                 $mysqldump,
                 '--defaults-extra-file=' . $defaultsFile,
+                '--protocol=TCP',
+                '--host=' . $host,
+                '--port=' . $port,
                 '--single-transaction',
                 '--routines',
                 '--triggers',
                 '--add-drop-table',
-                '--default-character-set=' . (string) ($connection['charset'] ?? 'utf8mb4'),
-                $database,
+                '--default-character-set=' . $charset,
                 '--result-file=' . $path,
-            ]);
+                $database,
+            ], base_path(), $this->windowsSafeEnvironment());
 
             $process->setTimeout(300);
             $process->run();
@@ -57,12 +63,20 @@ class DatabaseBackupService
             if (! $process->isSuccessful()) {
                 @unlink($path);
                 $output = trim($process->getErrorOutput() ?: $process->getOutput());
-                throw new RuntimeException('No se pudo generar el backup. ' . $this->sanitizeOutput($output, $password));
+                throw new RuntimeException(
+                    'No se pudo generar el backup. ' .
+                    $this->backupContext($mysqldump, $host, $port, $database) .
+                    ' Detalle: ' . $this->sanitizeOutput($output, $password)
+                );
             }
 
             if (! is_file($path) || filesize($path) === 0) {
                 @unlink($path);
-                throw new RuntimeException('El backup se genero vacio. Verifica permisos y conexion de base de datos.');
+                throw new RuntimeException(
+                    'El backup se genero vacio. ' .
+                    $this->backupContext($mysqldump, $host, $port, $database) .
+                    ' Verifica permisos y conexion de base de datos.'
+                );
             }
 
             return $this->formatBackup($path);
@@ -142,11 +156,24 @@ class DatabaseBackupService
         }
     }
 
+    private function ensureTempDirectoryExists(): void
+    {
+        $directory = $this->tempDirectory();
+
+        if (is_dir($directory)) {
+            return;
+        }
+
+        if (! mkdir($directory, 0755, true) && ! is_dir($directory)) {
+            throw new RuntimeException('No se pudo crear la carpeta temporal de backups.');
+        }
+    }
+
     private function resolveMysqldumpPath(): string
     {
         $candidates = [
-            'mysqldump',
             'C:\\xampp\\mysql\\bin\\mysqldump.exe',
+            'mysqldump',
         ];
 
         foreach ($candidates as $candidate) {
@@ -155,7 +182,7 @@ class DatabaseBackupService
             }
 
             try {
-                $process = new Process([$candidate, '--version']);
+                $process = new Process([$candidate, '--version'], base_path(), $this->windowsSafeEnvironment());
                 $process->setTimeout(10);
                 $process->run();
 
@@ -167,12 +194,14 @@ class DatabaseBackupService
             }
         }
 
-        throw new RuntimeException('No se encontro mysqldump. En XAMPP suele estar en C:\\xampp\\mysql\\bin; agrega esa carpeta al PATH o verifica que exista mysqldump.exe.');
+        throw new RuntimeException('No se encontro mysqldump. Se intento C:\\xampp\\mysql\\bin\\mysqldump.exe y mysqldump del PATH. Agrega C:\\xampp\\mysql\\bin al PATH o verifica que exista mysqldump.exe.');
     }
 
-    private function createDefaultsFile(array $connection): string
+    private function createDefaultsFile(array $connection, string $host, string $port): string
     {
-        $path = tempnam(sys_get_temp_dir(), 'finanzas_mysqldump_');
+        $this->ensureTempDirectoryExists();
+
+        $path = tempnam($this->tempDirectory(), 'mysqldump_');
 
         if (! $path) {
             throw new RuntimeException('No se pudo crear el archivo temporal para mysqldump.');
@@ -182,15 +211,87 @@ class DatabaseBackupService
 
         $this->appendOptionLine($lines, 'user', $connection['username'] ?? null);
         $this->appendOptionLine($lines, 'password', $connection['password'] ?? null, skipEmpty: true);
-        $this->appendOptionLine($lines, 'host', $connection['host'] ?? null);
-        $this->appendOptionLine($lines, 'port', $connection['port'] ?? null);
-        $this->appendOptionLine($lines, 'socket', $connection['unix_socket'] ?? null, skipEmpty: true);
+        $this->appendOptionLine($lines, 'host', $host);
+        $this->appendOptionLine($lines, 'port', $port);
+        $this->appendOptionLine($lines, 'protocol', 'TCP');
         $this->appendOptionLine($lines, 'default-character-set', $connection['charset'] ?? 'utf8mb4');
 
         file_put_contents($path, implode(PHP_EOL, $lines) . PHP_EOL);
         @chmod($path, 0600);
 
         return $path;
+    }
+
+    private function tempDirectory(): string
+    {
+        return storage_path('app/temp');
+    }
+
+    private function normalizeHost(string $host): string
+    {
+        $host = trim($host);
+
+        if ($host === '' || strtolower($host) === 'localhost') {
+            return '127.0.0.1';
+        }
+
+        return $host;
+    }
+
+    private function normalizePort(mixed $port): string
+    {
+        $port = trim((string) $port);
+
+        return $port !== '' ? $port : '3306';
+    }
+
+    private function windowsSafeEnvironment(): array
+    {
+        $environment = getenv();
+        $environment = is_array($environment) ? $environment : [];
+
+        foreach ($_SERVER as $key => $value) {
+            if (is_scalar($value) && ! array_key_exists($key, $environment)) {
+                $environment[$key] = (string) $value;
+            }
+        }
+
+        $path = $environment['PATH'] ?? $environment['Path'] ?? null;
+        if (! $path) {
+            $path = getenv('PATH') ?: getenv('Path') ?: null;
+        }
+
+        if ($path) {
+            $environment['PATH'] = (string) $path;
+            $environment['Path'] = (string) $path;
+        }
+
+        $windowsDirectory = getenv('SystemRoot') ?: getenv('WINDIR') ?: 'C:\\Windows';
+        $tempDirectory = getenv('TEMP') ?: getenv('TMP') ?: sys_get_temp_dir();
+
+        $environment['SystemRoot'] = (string) ($environment['SystemRoot'] ?? $windowsDirectory);
+        $environment['WINDIR'] = (string) ($environment['WINDIR'] ?? $windowsDirectory);
+        $environment['TEMP'] = (string) ($environment['TEMP'] ?? $tempDirectory);
+        $environment['TMP'] = (string) ($environment['TMP'] ?? $tempDirectory);
+
+        $cleanEnvironment = [];
+        foreach ($environment as $key => $value) {
+            if ($value === null || is_array($value) || is_object($value)) {
+                continue;
+            }
+
+            $cleanEnvironment[$key] = (string) $value;
+        }
+
+        return $cleanEnvironment;
+    }
+
+    private function backupContext(string $mysqldump, string $host, string $port, string $database): string
+    {
+        return 'mysqldump usado: ' . $mysqldump .
+            '; host usado: ' . $host .
+            '; puerto usado: ' . $port .
+            '; database usado: ' . $database . '.';
     }
 
     private function appendOptionLine(array &$lines, string $key, mixed $value, bool $skipEmpty = false): void
