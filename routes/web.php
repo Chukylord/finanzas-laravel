@@ -1,22 +1,21 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\BackupController;
 use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\IncomeController;
-use App\Http\Controllers\ExpenseController;
-use App\Http\Controllers\RecurringController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DebtController;
+use App\Http\Controllers\ExchangeRateController;
+use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\IncomeController;
 use App\Http\Controllers\InvestmentAccountController;
 use App\Http\Controllers\InvestmentMovementController;
-use App\Http\Controllers\ExchangeRateController;
+use App\Http\Controllers\InvestmentReportController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RecurringController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SubcategoryController;
-use App\Http\Controllers\InvestmentReportController;
-use App\Http\Controllers\BackupController;
-
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return Auth::check()
@@ -84,6 +83,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/exchange-rates', [ExchangeRateController::class, 'index'])->name('exchange-rates.index');
     Route::post('/exchange-rates', [ExchangeRateController::class, 'store'])->name('exchange-rates.store');
+    Route::get('/exchange-rates/{exchange_rate}/edit', [ExchangeRateController::class, 'edit'])->name('exchange-rates.edit');
+    Route::put('/exchange-rates/{exchange_rate}', [ExchangeRateController::class, 'update'])->name('exchange-rates.update');
     Route::delete('/exchange-rates/{exchange_rate}', [ExchangeRateController::class, 'destroy'])->name('exchange-rates.destroy');
 
     Route::get('/reports/export', [ReportController::class, 'export'])->name('reports.export');

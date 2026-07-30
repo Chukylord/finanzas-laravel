@@ -73,6 +73,33 @@
             </form>
         </div>
 
+        @if($exchangeRate)
+            <div class="rounded-2xl border border-indigo-100 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-900/20 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <div class="font-semibold text-indigo-800 dark:text-indigo-200">
+                        Dólar utilizado: ${{ number_format($usdArs, 4, ',', '.') }} — fecha {{ $exchangeRate->date->format('d/m/Y') }}
+                    </div>
+                    <div class="mt-1 text-sm text-indigo-700 dark:text-indigo-300">
+                        Es la última cotización propia disponible hasta el cierre del período, nunca una cotización posterior.
+                    </div>
+                </div>
+                <a href="{{ route('exchange-rates.index') }}"
+                   class="px-3 py-2 rounded-xl border border-indigo-200 dark:border-indigo-800 text-sm font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/40">
+                    Ver cotizaciones
+                </a>
+            </div>
+        @else
+            <div class="rounded-2xl border border-amber-100 dark:border-amber-900 bg-amber-50 dark:bg-amber-900/20 px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+                <div class="font-semibold text-amber-800 dark:text-amber-200">
+                    Todavía no cargaste una cotización del dólar
+                </div>
+                <a href="{{ route('exchange-rates.index') }}"
+                   class="px-3 py-2 rounded-xl border border-amber-200 dark:border-amber-800 text-sm font-medium hover:bg-amber-100 dark:hover:bg-amber-900/40">
+                    Cargar cotización
+                </a>
+            </div>
+        @endif
+
         {{-- Cards principales --}}
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
@@ -93,6 +120,13 @@
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     Saldo neto mensual en dólares.
                 </p>
+                @if($usdNetArs !== null)
+                    <p class="mt-2 text-xs font-medium text-indigo-700 dark:text-indigo-200">
+                        Equivale a ${{ number_format($usdNetArs, 2, ',', '.') }} ARS
+                    </p>
+                @else
+                    <p class="mt-2 text-xs text-amber-700 dark:text-amber-200">Sin cotización</p>
+                @endif
             </div>
 
             <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm p-5">
@@ -197,6 +231,12 @@
                         <span class="font-semibold">Neto</span>
                         <span class="font-bold">USD {{ number_format($summary['usd']['net'], 2, ',', '.') }}</span>
                     </div>
+                    @if($combinedNetArs !== null)
+                        <div class="border-t border-gray-200 dark:border-gray-800 pt-2 flex justify-between">
+                            <span class="font-semibold">Neto combinado en ARS</span>
+                            <span class="font-bold">${{ number_format($combinedNetArs, 2, ',', '.') }}</span>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>
@@ -215,6 +255,7 @@
                             <th class="text-left font-medium px-4 sm:px-6 py-3">Cuenta</th>
                             <th class="text-right font-medium px-4 sm:px-6 py-3">Neto ARS</th>
                             <th class="text-right font-medium px-4 sm:px-6 py-3">Neto USD</th>
+                            <th class="text-right font-medium px-4 sm:px-6 py-3">Equiv. ARS</th>
                             <th class="text-right font-medium px-4 sm:px-6 py-3">USD comprados</th>
                             <th class="text-right font-medium px-4 sm:px-6 py-3">Mov.</th>
                         </tr>
@@ -236,6 +277,14 @@
                                 </td>
 
                                 <td class="px-4 sm:px-6 py-3 text-right font-semibold">
+                                    @if($row['ars_equiv'] !== null)
+                                        ${{ number_format($row['ars_equiv'], 2, ',', '.') }}
+                                    @else
+                                        <span class="text-gray-400">Sin cotización</span>
+                                    @endif
+                                </td>
+
+                                <td class="px-4 sm:px-6 py-3 text-right font-semibold">
                                     USD {{ number_format($row['usd_bought'], 2, ',', '.') }}
                                 </td>
 
@@ -245,7 +294,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="px-4 sm:px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                                <td colspan="6" class="px-4 sm:px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                                     No hay movimientos para el período seleccionado.
                                 </td>
                             </tr>

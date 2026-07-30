@@ -61,11 +61,15 @@
                 <span>📈</span> <span>Inversiones</span>
             </a>
 
+            <a class="{{ $link }} {{ request()->routeIs('exchange-rates.*') ? $active : '' }}" href="{{ route('exchange-rates.index') }}">
+                <span>USD</span> <span>Tipo de cambio</span>
+            </a>
+
             <a class="{{ $link }} {{ request()->routeIs('reports.*') ? $active : '' }}" href="{{ route('reports.index') }}">
                 <span>📈</span> <span>Informes</span>
             </a>
 
-            <a class="{{ $link }} {{ request()->routeIs('reports.*') ? $active : '' }}" href="{{ route('investment-reports.index') }}">
+            <a class="{{ $link }} {{ request()->routeIs('investment-reports.*') ? $active : '' }}" href="{{ route('investment-reports.index') }}">
                 <span>📈</span> <span>Informes inversión</span>
             </a>
             

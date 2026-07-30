@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ExchangeRate;
 use App\Models\InvestmentAccount;
 use App\Models\InvestmentMovement;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Carbon\Carbon;
+use Illuminate\Validation\Rule;
 
 class InvestmentReportController extends Controller
 {
@@ -14,12 +16,26 @@ class InvestmentReportController extends Controller
     {
         $userId = Auth::id();
 
-        $month = (int) $request->get('month', now()->month);
-        $year = (int) $request->get('year', now()->year);
-        $accountId = $request->get('account_id');
+        $validated = $request->validate([
+            'month' => ['nullable', 'integer', 'between:1,12'],
+            'year' => ['nullable', 'integer', 'between:2000,2100'],
+            'account_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('investment_accounts', 'id')
+                    ->where(fn ($query) => $query->where('user_id', $userId)),
+            ],
+        ]);
+
+        $month = (int) ($validated['month'] ?? now()->month);
+        $year = (int) ($validated['year'] ?? now()->year);
+        $accountId = $validated['account_id'] ?? null;
 
         $start = Carbon::create($year, $month, 1)->startOfMonth()->toDateString();
         $end = Carbon::create($year, $month, 1)->endOfMonth()->toDateString();
+        $rateCutoff = Carbon::parse($end)->min(Carbon::today())->toDateString();
+        $exchangeRate = ExchangeRate::latestForUserOnOrBefore((int) $userId, $rateCutoff);
+        $usdArs = $exchangeRate ? (float) $exchangeRate->usd_ars : null;
 
         $accounts = InvestmentAccount::where('user_id', $userId)
             ->orderBy('name')
@@ -108,10 +124,12 @@ class InvestmentReportController extends Controller
         }
 
         $usdBought = $summary['usd']['deposits'];
+        $usdNetArs = $usdArs !== null ? $summary['usd']['net'] * $usdArs : null;
+        $combinedNetArs = $usdNetArs !== null ? $summary['ars']['net'] + $usdNetArs : null;
 
         $byAccount = $movements
             ->groupBy('investment_account_id')
-            ->map(function ($items) use ($positiveTypes, $negativeTypes) {
+            ->map(function ($items) use ($positiveTypes, $negativeTypes, $usdArs) {
                 $account = $items->first()->account;
 
                 $arsNet = 0;
@@ -147,6 +165,7 @@ class InvestmentReportController extends Controller
                     'account' => $account,
                     'ars_net' => $arsNet,
                     'usd_net' => $usdNet,
+                    'ars_equiv' => $usdArs !== null ? $arsNet + ($usdNet * $usdArs) : null,
                     'usd_bought' => $usdBought,
                     'count' => $items->count(),
                 ];
@@ -161,7 +180,11 @@ class InvestmentReportController extends Controller
             'movements',
             'summary',
             'usdBought',
-            'byAccount'
+            'usdNetArs',
+            'combinedNetArs',
+            'byAccount',
+            'exchangeRate',
+            'usdArs'
         ));
     }
 }

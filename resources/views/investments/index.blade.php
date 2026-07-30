@@ -17,14 +17,11 @@
                 <div class="mt-1">
                     @if($usdArs)
                         <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200">
-                            USD/ARS: {{ number_format($usdArs, 2, ',', '.') }}
-                        </span>
-                        <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                            ({{ \Carbon\Carbon::parse($rate->date)->format('d/m/Y') }})
+                            Dólar utilizado: ${{ number_format($usdArs, 4, ',', '.') }} — fecha {{ $rate->date->format('d/m/Y') }}
                         </span>
                     @else
                         <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-                            Sin tipo de cambio cargado (USD→ARS)
+                            Todavía no cargaste una cotización del dólar
                         </span>
                     @endif
                 </div>
